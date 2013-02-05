@@ -47,5 +47,8 @@ lrspp:  sump.hpp sump_io.hpp lrs lrspp.hpp lrspp.cu
 lrs:  
 	cd lrs && make
 
+sump.tar:  
+	tar -czf sump.tar *.cuh *.cu *.hpp *.c Makefile chimp/*.cuh chimp/*.cu chimp/*.cpp chimp/Makefile
+
 clean:  
 	-rm $(OBJS) sump zsump
