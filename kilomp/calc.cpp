@@ -2,8 +2,10 @@
  * Simple host-side calculator to test kilomp library.
  * 
  * Command syntax:
- * cmd       := var '=' hexstring  # assign hex value to variable
+ * cmd       := var '=' var        # assign variable to other variable
+ *            | var '=' hexstring  # assign hex value to variable
  *            | var                # print variable
+ *            | "swap" var var     # swap two variables
  * var       := '$' [0-9]
  * hexstring := '-'? [0-9A-Fa-f]+
  * 
@@ -60,14 +62,14 @@ struct mp_vars {
 }; /* struct mp_vars */
 
 /** Failure flag for variable parsing */
-const int not_var = -1;
+kilo::u32 not_var = -1;
 
 /** 
  * Parses a variable
  * @param s			The string to parse
  * @return the index of the variable, or `not_var` for failure
  */
-int parse_var(const std::string& s) {
+kilo::u32 parse_var(const std::string& s) {
 	if ( s[0] != '$' || s.size() != 2 )	return not_var;
 	
 	if ( s[1] >= '0' && s[1] <= '9' ) return s[1] - '0';
@@ -82,12 +84,50 @@ int parse_var(const std::string& s) {
 void parse_cmd(std::string line, mp_vars& vars) {
 	std::istringstream in(line);
 	std::string s;
+	kilo::u32 v1, v2;
 	
 	if ( in.eof() ) return;  //ignore empty command
 	
-	//parse variable
 	in >> s;
-	int v1 = parse_var(s);
+	
+	
+	if ( s == std::string("swap") ) {  //handle swap command
+		if ( in.eof() ) {
+			std::cerr << "Expected arguments to `swap'" << std::endl;
+			return;
+		}
+		
+		in >> s;
+		v1 = parse_var(s);
+		if ( v1 == not_var ) {
+			std::cerr << "`" << s << "' is not a variable - expects '$' [0-9]" << std::endl;
+			return;
+		}
+		
+		if ( in.eof() ) {
+			std::cerr << "Expected second operand to `swap'" << std::endl;
+			return;
+		}
+		
+		in >> s;
+		v2 = parse_var(s);
+		if ( v2 == not_var ) {
+			std::cerr << "`" << s << "' is not a variable - expects '$' [0-9]" << std::endl;
+			return;
+		}
+		
+		if ( ! in.eof() ) {
+			std::cerr << "Too many arguments - expected nothing after `" << s << "'" << std::endl;
+			return;
+		}
+		
+		kilo::swap(vars.vs, v1, v2);
+		vars.print(v1);
+		return;
+	}
+	
+	//read variable
+	v1 = parse_var(s);
 	if ( v1 == not_var ) {
 		std::cerr << "`" << s << "' is not a variable - expects '$' [0-9]" << std::endl;
 		return;
@@ -114,7 +154,15 @@ void parse_cmd(std::string line, mp_vars& vars) {
 			return;
 		}
 		
-		vars.parse(v1, s);
+		v2 = parse_var(s);
+		if ( v2 == not_var ) {
+			//assign constant
+			vars.parse(v1, s);
+		} else {
+			//assign variable
+			kilo::assign(vars.vs, v1, v2);
+		}
+		
 		vars.print(v1);
 		return;
 	} else {

@@ -136,6 +136,36 @@ DEVICE_HOST void clear(mpv v, u32 alloc_l) {
 	free(v);
 }
 
+/**
+ * Copies one value into another slot
+ * @param v			The vector
+ * @param i			The slot to copy to
+ * @param j			The slot to copy from
+ * @return the number of limbs in slot i
+ */
+DEVICE_HOST u32 assign(mpv v, u32 i, u32 j) {
+	u32 nl = size(v, j);
+	for (u32 k = 0; k <= nl; ++k) { v[k][i] = v[k][j]; }
+	return nl;
+}
+
+/**
+ * Swaps the values in two slots
+ * @param v			The vector
+ * @param i			One slot
+ * @param j			The other slot
+ * @return the maximum number of limbs used in either slot
+ */
+DEVICE_HOST u32 swap(mpv v, u32 i, u32 j) {
+	u32 nl = size(v, i);
+	u32 nj = size(v, j);
+	if ( nj > nl ) { nl = nj; }
+	
+	limb t;
+	for (u32 k = 0; k <= nl; ++k) { t = v[k][i]; v[k][i] = v[k][j]; v[k][j] = t; }
+	return nl;
+}
+
 namespace {
 /** 
  * Converts half-byte values to corresponding hex characters.
