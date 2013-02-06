@@ -86,11 +86,11 @@ DEVICE_HOST mpv init_mpv(u32 n, u32 alloc_l = 4) {
 	
 	//zero element values
 	limb* l = (limb*)malloc(n*limb_size);
-	for (int j = 0; j < n; ++j) { l[j] = 0; }
+	for (u32 j = 0; j < n; ++j) { l[j] = 0; }
 	v[0] = l;
 	
 	//allocate data limbs
-	for (int i = 1; i <= alloc_l; ++i) {
+	for (u32 i = 1; i <= alloc_l; ++i) {
 		l = (limb*)malloc(n*limb_size);
 		v[i] = l;
 	}
@@ -111,7 +111,7 @@ DEVICE_HOST mpv expand(mpv v, u32 n, u32 old_l, u32 alloc_l) {
 	mpv w = (mpv)malloc((1+alloc_l)*sizeof(limb*));
 	
 	//copy old limb pointers
-	int i = 0;
+	u32 i = 0;
 	for (; i <= old_l; ++i) { w[i] = v[i]; }
 	//allocate new data limbs
 	limb* l;
@@ -132,7 +132,7 @@ DEVICE_HOST mpv expand(mpv v, u32 n, u32 old_l, u32 alloc_l) {
  * @param alloc_l	The number of limbs allocated
  */
 DEVICE_HOST void clear(mpv v, u32 alloc_l) {
-	for (int i = 0; i <= alloc_l; ++i) { free(v[i]); }
+	for (u32 i = 0; i <= alloc_l; ++i) { free(v[i]); }
 	free(v);
 }
 
@@ -198,7 +198,7 @@ DEVICE_HOST s32 unch(char c) {
 /** 
  * Prints the integer into the given character buffer. 
  * Caller is responsible to ensure sufficient space in buffer; 
- * size(v,i) + 2 will do.
+ * 8*size(v,i) + 2 will do.
  * @param c		The character buffer to print into. Will print 
  * 				value in hexadecimal (using uppercase letters), 
  * 				most-significant figure first, prefixed with '-' 
@@ -242,7 +242,7 @@ DEVICE_HOST void print(const mpv v, int i, char* c) {
 		f2: *c = ch((x >> 4) & 0xF); ++c;
 		f1: *c = ch(x & 0xF); ++c;
 		
-		--j
+		--j;
 	}
 	
 	//add trailing null
@@ -252,17 +252,18 @@ DEVICE_HOST void print(const mpv v, int i, char* c) {
 /**
  * Loads a value from a string.
  * Caller is responsible to ensure sufficient limbs; 
- * (len+7) >> 3 will do (1/8th len, round up).
+ * (len+7)/8 will do.
  * @param v		The vector
  * @param i		The element
  * @param c		A string of hexadecimal digits, prefixed with '-' for a 
  * 				negative value
  * @param len	The length of c
+ * @return the number of limbs used
  */
-DEVICE_HOST void parse(mpv v, u32 i, const char* c, u32 len) {
+DEVICE_HOST u32 parse(mpv v, u32 i, const char* c, u32 len) {
 	if ( len == 0 ) {
 		v[0][i] = 0;
-		return;
+		return 0;
 	}
 	
 	//check negative
@@ -279,7 +280,7 @@ DEVICE_HOST void parse(mpv v, u32 i, const char* c, u32 len) {
 	//check for zero value
 	if ( len == 0 ) {
 		v[0][i] = 0;
-		return;
+		return 0;
 	}
 	
 	//calculate number of limbs (1/8th number of characters, round up)
@@ -317,6 +318,8 @@ DEVICE_HOST void parse(mpv v, u32 i, const char* c, u32 len) {
 		v[j][i] = x;
 		--j;
 	}
+	
+	return abs(used_l);
 }
 	
 } /* namespace kilo */
