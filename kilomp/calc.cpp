@@ -55,7 +55,7 @@ struct mp_vars {
 		
 		//print into buffer, then stdout
 		kilo::print(vs,i,buf);
-		std::cout << "$" << i << " = " << buf << std::endl;
+		std::cout << buf << std::endl;
 	}
 }; /* struct mp_vars */
 
@@ -115,6 +115,7 @@ void parse_cmd(std::string line, mp_vars& vars) {
 		}
 		
 		vars.parse(v1, s);
+		vars.print(v1);
 		return;
 	} else {
 		std::cerr << "`" << s << "' is not an operator - expects '='" << std::endl;

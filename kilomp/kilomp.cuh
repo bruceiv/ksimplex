@@ -285,6 +285,7 @@ DEVICE_HOST u32 parse(mpv v, u32 i, const char* c, u32 len) {
 	
 	//calculate number of limbs (1/8th number of characters, round up)
 	used_l *= ((len+7) >> 3);
+	v[0][i] = used_l;
 	
 	//parse first character
 	u32 j = abs(used_l);
