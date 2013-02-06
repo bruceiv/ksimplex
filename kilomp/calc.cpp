@@ -6,6 +6,7 @@
  *            | var '=' hexstring  # assign hex value to variable
  *            | var                # print variable
  *            | "swap" var var     # swap two variables
+ *            | "neg" var          # negate a variable
  * var       := '$' [0-9]
  * hexstring := '-'? [0-9A-Fa-f]+
  * 
@@ -122,6 +123,28 @@ void parse_cmd(std::string line, mp_vars& vars) {
 		}
 		
 		kilo::swap(vars.vs, v1, v2);
+		vars.print(v1);
+		return;
+		
+	} else if ( s == std::string("neg") ) {  //handle negate command
+		if ( in.eof() ) {
+			std::cerr << "Expected arguments to `neg'" << std::endl;
+			return;
+		}
+		
+		in >> s;
+		v1 = parse_var(s);
+		if ( v1 == not_var ) {
+			std::cerr << "`" << s << "' is not a variable - expects '$' [0-9]" << std::endl;
+			return;
+		}
+		
+		if ( ! in.eof() ) {
+			std::cerr << "Too many arguments - expected nothing after `" << s << "'" << std::endl;
+			return;
+		}
+		
+		kilo::neg(vars.vs, v1);
 		vars.print(v1);
 		return;
 	}

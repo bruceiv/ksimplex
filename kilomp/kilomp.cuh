@@ -2,14 +2,11 @@
 
 /** 
  * Main header for Kilo Multi-Precision Integer project.
- * Defines basic type (interleaved array of mp-ints), and operations on 
- * elements of that array.
+ * Defines basic type (interleaved array of mp-ints), and operations on elements of that array.
  * 
- * By convention, arithmetic operations all take two index parameters, 
- * assigning the result to the first parameter and returning the number 
- * of limbs used by the new value; the caller is responsible for 
- * ensuring the vector is expanded to a sufficiently large number of 
- * limbs.
+ * By convention, arithmetic operations all take two index parameters, assigning the result to the 
+ * first parameter; the caller is responsible for ensuring the vector is expanded to a sufficiently 
+ * large number of limbs.
  * 
  * @author Aaron Moss
  */
@@ -48,28 +45,28 @@ typedef u32 limb;
 static const u32 limb_size = 4;
 
 /** @return how many limbs does the i'th element of v use */
-inline u32 size(const mpv v, int i) {
+inline u32 size(const mpv v, u32 i) {
 	return abs(static_cast<s32>(v[0][i]));
 }
 
 /** @return what is the sign of the i'th element of v */
-inline s32 sign(const mpv v, int i) {
+inline s32 sign(const mpv v, u32 i) {
 	s32 u = static_cast<s32>(v[0][i]);
 	return ( u > 0 ) - ( u < 0 );
 }
 
 /** @return is the i'th element of v zero? */
-inline bool is_zero(const mpv v, int i) {
+inline bool is_zero(const mpv v, u32 i) {
 	return v[0][i] == 0;
 }
 
 /** @return is the i'th element of v positive? */
-inline bool is_pos(const mpv v, int i) {
+inline bool is_pos(const mpv v, u32 i) {
 	return static_cast<s32>(v[0][i]) > 0;
 }
 
 /** @return is the i'th element of v negative? */
-inline bool is_neg(const mpv v, int i) {
+inline bool is_neg(const mpv v, u32 i) {
 	return static_cast<s32>(v[0][i]) < 0;
 }
 
@@ -141,12 +138,10 @@ DEVICE_HOST void clear(mpv v, u32 alloc_l) {
  * @param v			The vector
  * @param i			The slot to copy to
  * @param j			The slot to copy from
- * @return the number of limbs in slot i
  */
-DEVICE_HOST u32 assign(mpv v, u32 i, u32 j) {
+DEVICE_HOST void assign(mpv v, u32 i, u32 j) {
 	u32 nl = size(v, j);
 	for (u32 k = 0; k <= nl; ++k) { v[k][i] = v[k][j]; }
-	return nl;
 }
 
 /**
@@ -154,16 +149,19 @@ DEVICE_HOST u32 assign(mpv v, u32 i, u32 j) {
  * @param v			The vector
  * @param i			One slot
  * @param j			The other slot
- * @return the maximum number of limbs used in either slot
  */
-DEVICE_HOST u32 swap(mpv v, u32 i, u32 j) {
+DEVICE_HOST void swap(mpv v, u32 i, u32 j) {
 	u32 nl = size(v, i);
 	u32 nj = size(v, j);
 	if ( nj > nl ) { nl = nj; }
 	
 	limb t;
 	for (u32 k = 0; k <= nl; ++k) { t = v[k][i]; v[k][i] = v[k][j]; v[k][j] = t; }
-	return nl;
+}
+
+/** Negates the i'th element of v */
+DEVICE_HOST void neg(mpv v, u32 i) {
+	v[0][i] = -(static_cast<s32>(v[0][i]));
 }
 
 namespace {
@@ -234,7 +232,7 @@ DEVICE_HOST s32 unch(char c) {
  * 				most-significant figure first, prefixed with '-' 
  * 				for negative values.
  */
-DEVICE_HOST void print(const mpv v, int i, char* c) {
+DEVICE_HOST void print(const mpv v, u32 i, char* c) {
 	//check for zero
 	if ( is_zero(v, i) ) {
 		c[0] = '0'; c[1] = '\0';
