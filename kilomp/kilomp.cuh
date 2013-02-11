@@ -186,20 +186,21 @@ DEVICE_HOST bool cmpu(mpv v, u32 i, u32 j) {
 
 namespace {
 /** 
- * Addition function - (i'th element of v) += (j'th element of v).
+ * Addition function - (r'th element of v) = (i'th element of v) + (j'th element of v).
  * @param v		The vector
+ * @param r		The index of the result (may alias i or j)
  * @param i		The index of the first operand (if fewer limbs than n, the extras should be 
  * 				zeroed)
  * @param j		The index of the second operand
  * @param n		Number of limbs in v[j]
  * @return the carry bit from the last addition
  */
-DEVICE_HOST static u32 add_l(mpv v, u32 i, u32 j, u32 n) {
+DEVICE_HOST static u32 add_l(mpv v, u32 r, u32 i, u32 j, u32 n) {
 	u32 c = 0;
 	for (u32 k = 1; k <= n; ++k) {
-		u32 t = v[k][i] + v[k][j];                 //overflow iff v[k][i] > t
-		v[k][i] = t + c;                           //overflow iff t = 2**32 - 1 and c = 1
-		c = (t < v[k][i]) | (c & (v[k][i] == 0));  //check overflow
+		u32 t = v[k][i] + v[k][j];                 //overflow iff v[k][i] > t or v[k][j] > t
+		v[k][r] = t + c;                           //overflow iff t = 2**32 - 1 and c = 1
+		c = (t < v[k][i]) | (c & (v[k][r] == 0));  //check overflow
 	}
 	return c;
 }
@@ -207,7 +208,8 @@ DEVICE_HOST static u32 add_l(mpv v, u32 i, u32 j, u32 n) {
 /**
  * Subtraction function - (r'th element of v) = (i'th element of v) - (j'th element of v).
  * @param v		The vector
- * @param r		The index of the result (if fewer limbs than n, the extras should be zeroed)
+ * @param r		The index of the result (may alias i or j) (if fewer limbs than n, the extras 
+ * 				should be zeroed)
  * @param i		The index of the first operand
  * @param j		The index of the second operand
  * @param n		Number of limbs in v[j]
@@ -222,6 +224,35 @@ DEVICE_HOST static u32 sub_l(mpv v, u32 r, u32 i, u32 j, u32 n) {
 	}
 	return b;
 }
+
+/** 
+ * Multiplication function - (r'th element of v) = (i'th element of v) * (j'th element of v)
+ * @param v		The vector
+ * @param r		The index of the result (should be initially zeroed) (may NOT alias i or j)
+ * @param i		The index of the first operand
+ * @param j		The index of the second operand
+ * @param n		The number of limbs in the i'th element of v
+ * @param m		The number of limbs in the j'th element of v
+ */
+DEVICE_HOST static void mul_l(mpv v, u32 r, u32 i, u32 j, u32 n, u32 m) {
+	for (u32 k = 0; k < m; ++k) {
+		u32 c = 0;
+		for (u32 l = 0; l < n; ++l) {
+			u64 i_l = v[l+1][i], j_k = v[k+1][j], r_kl = v[k+l+1][r];
+			
+			//We know uv won't overflow as (taking n = 2**32), (n-1)**2 + 2(n-1) = n**2 - 1.
+			// That is, we can multiply any two limbs, and add any two other limbs, the result will 
+			// fit in a double-wide space.
+			r_kl += c;
+			u64 uv = (i_l * j_k) + r_kl;
+			
+			v[k+l+1][r] = static_cast<u32>(uv & 0xFFFFFFFF);  //put low-order bits in output
+			c = static_cast<u32>(uv >> 32);                   //put high-order bits in carry
+		}
+		v[k+n+1][r] = c;  //store last carry in result
+	}
+}
+
 } /* unnamed */
 
 /** 
@@ -241,7 +272,7 @@ DEVICE_HOST static u32 add(mpv v, u32 i, u32 j) {
 		for (; k <= that_len; ++k) { v[k][i] = 0; }
 		
 		//add
-		u32 c = add_l(v, i, j, that_len);
+		u32 c = add_l(v, i, i, j, that_len);
 		//propegate carry
 		k = that_len+1;
 		for (; k <= len; ++k) {
@@ -323,7 +354,7 @@ DEVICE_HOST static u32 sub(mpv v, u32 i, u32 j) {
 		for (; k <= that_len; ++k) { v[k][i] = 0; }
 		
 		//add
-		u32 c = add_l(v, i, j, that_len);
+		u32 c = add_l(v, i, i, j, that_len);
 		//propegate carry
 		k = that_len+1;
 		for (; k <= len; ++k) {
@@ -338,6 +369,34 @@ DEVICE_HOST static u32 sub(mpv v, u32 i, u32 j) {
 		return r;
 		
 	}
+}
+
+/** 
+ * Multiplies the i'th element of v by the j'th element, storing the result in the r'th element.
+ * Assumes there are enough limbs allocated in v to hold the result of the multiplication; 
+ * size(v, i) + size(v, j) will do.
+ * @return the number of limbs used by the r'th element of v after subtraction
+ */
+DEVICE_HOST static u32 mul(mpv v, u32 r, u32 i, u32 j) {
+	u32 n = size(v, i), m = size(v, j);
+	//special case zeros
+	if ( n == 0 || m == 0 ) {
+		v[0][r] = 0;
+		return 0;
+	}
+	
+	u32 l = n+m;
+	
+	//ensure limbs of r are zeroed
+	for (u32 k = 1; k <= l; ++k) { v[k][r] = 0; }
+	//multiply
+	mul_l(v, r, i, j, n, m);
+	
+	//reset length -- l, accounting for possibility of short operands, with combination of signs
+	l -= (v[l][r] == 0);
+	v[0][r] = l;
+	if ( ! same_sign(v, i, j) ) v[0][r] *= -1;
+	return l;
 }
 
 namespace {

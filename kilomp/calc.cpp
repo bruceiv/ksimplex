@@ -2,13 +2,15 @@
  * Simple host-side calculator to test kilomp library.
  * 
  * Command syntax (one command per line):
- * cmd       := var ':' var        # assign variable to other variable
- *            | var ':' hexstring  # assign hex value to variable
- *            | var                # print variable
- *            | "swap" var var     # swap two variables
- *            | "neg" var          # negate a variable
- *            | var '+' var        # add second variable to first
- *            | var '-' var        # subtract second variable from first
+ * cmd       := var '=' var          # assign variable to other variable
+ *            | var '=' hexstring    # assign hex value to variable
+ *            | var                  # print variable
+ *            | "swap" var var       # swap two variables
+ *            | "neg" var            # negate a variable
+ *            | "size" var           # print number of limbs in a variable
+ *            | var '+=' var         # add second variable to first
+ *            | var '-=' var         # subtract second variable from first
+ *            | var '=' var '*' var  # set first variable to the product of second and third
  * var       := '$' [0-9]
  * hexstring := '-'? [0-9A-Fa-f]+
  * 
@@ -64,26 +66,42 @@ struct mp_vars {
 	}
 }; /* struct mp_vars */
 
-/** operator enum */
-enum oper {
-	asn,  /**< assignment operator */
+/** binary operator enum */
+enum bin_op {
+	asn,    /**< assignment operator */
 	
-	add,  /**< addition operator */
-	sub,  /**< subtraction operator */
+	adda,   /**< addition operator */
+	suba,   /**< subtraction operator */
 	
-	none  /**< invalid operator */
-}; /* enum oper */
+	no_bin  /**< invalid operator */
+}; /* enum bin_op */
 
-/** @return operator corresponding to s */
-oper get_oper(const std::string& s) {
+/** ternary operator enum */
+enum tri_op {
+	mul,    /**< multiplication */
+	
+	no_tri  /**< invalid operator */
+}; /* enum tri_op */
+
+/** @return binary operator corresponding to s */
+bin_op get_bin_op(const std::string& s) {
 	using std::string;
 	
 	if ( s == string("=") ) return asn;
 	
-	else if ( s == string("+") ) return add;
-	else if ( s == string("-") ) return sub;
+	else if ( s == string("+=") ) return adda;
+	else if ( s == string("-=") ) return suba;
 	
-	else return none;
+	else return no_bin;
+}
+
+/** @return ternary operator corresponding to s */
+tri_op get_tri_op(const std::string& s) {
+	using std::string;
+	
+	if ( s == string("*") ) return mul;
+	
+	else return no_tri;
 }
 
 /** Failure flag for variable parsing */
@@ -109,7 +127,7 @@ kilo::u32 parse_var(const std::string& s) {
 void parse_cmd(std::string line, mp_vars& vars) {
 	std::istringstream in(line);
 	std::string s;
-	kilo::u32 v1, v2;
+	kilo::u32 v1, v2, v3;
 	
 	if ( in.eof() ) return;  //ignore empty command
 	
@@ -171,6 +189,26 @@ void parse_cmd(std::string line, mp_vars& vars) {
 		kilo::neg(vars.vs, v1);
 		vars.print(v1);
 		return;
+	} else if ( s == std::string("size") ) {  //handle size command
+		if ( in.eof() ) {
+			std::cerr << "Expected arguments to `size'" << std::endl;
+			return;
+		}
+		
+		in >> s;
+		v1 = parse_var(s);
+		if ( v1 == not_var ) {
+			std::cerr << "`" << s << "' is not a variable - expects '$' [0-9]" << std::endl;
+			return;
+		}
+		
+		if ( ! in.eof() ) {
+			std::cerr << "Too many arguments - expected nothing after `" << s << "'" << std::endl;
+			return;
+		}
+		
+		std::cout << kilo::size(vars.vs, v1) << std::endl;
+		return;
 	}
 	
 	//read variable
@@ -187,17 +225,68 @@ void parse_cmd(std::string line, mp_vars& vars) {
 	}
 	
 	in >> s;
-	oper op = get_oper(s);
+	bin_op op = get_bin_op(s);
 	
 	//handle invalid operator
-	if ( op == none ) {
-		std::cerr << "`" << s << "' is not an operator - expects `:', `+', or `-'" << std::endl;
+	if ( op == no_bin ) {
+		std::cerr << "`" << s << "' is not an operator - expects `=', `+=', or `-='" << std::endl;
 		return;
 	}
 	
 	if ( in.eof() ) {
 		std::cerr << "Expected operand to `" << s << "'" << std::endl;
 		return;
+	}
+	
+	if ( op == asn ) {  //handle assign operators
+		in >> s;
+		v2 = parse_var(s);
+		
+		if ( v2 == not_var ) {  //assign constant
+			if ( ! in.eof() ) {
+				std::cerr << "Too many arguments - expected nothing after `" << s << "'" << std::endl;
+				return;
+			}
+			
+			vars.parse(v1, s);
+			vars.print(v1);
+			return;
+		}
+		
+		if ( in.eof() ) {  //assign variable
+			kilo::assign(vars.vs, v1, v2);
+			vars.print(v1);
+			return;
+		}
+		
+		//check for ternary operator
+		in >> s;
+		tri_op op2 = get_tri_op(s);
+		if ( op2 == no_tri ) {
+			std::cerr << "`" << s << "' is not an operator - expects `*'" << std::endl;
+			return;
+		}
+		
+		if ( in.eof() ) {
+			std::cerr << "Expected operand to `" << s << "'" << std::endl;
+			return;
+		}
+		
+		in >> s;
+		v3 = parse_var(s);
+		if ( v3 == not_var ) {
+			std::cerr << "`" << s << "' is not a variable - expects '$' [0-9]" << std::endl;
+			return;
+		}
+		
+		switch( op2 ) {
+		case mul: kilo::mul(vars.vs, v1, v2, v3); break;
+		case no_tri: /* handled above -- ignore */ break;
+		}
+		
+		vars.print(v1);
+		return;
+		
 	}
 	
 	in >> s;
@@ -209,22 +298,14 @@ void parse_cmd(std::string line, mp_vars& vars) {
 	
 	v2 = parse_var(s);
 	if ( v2 == not_var ) {
-		if ( op == asn ) {
-			//assign constant
-			vars.parse(v1, s);
-			vars.print(v1);
-			return;
-		} else {
-			std::cerr << "`" << s << "' is not a variable - expects '$' [0-9]" << std::endl;
-			return;
-		}
+		std::cerr << "`" << s << "' is not a variable - expects '$' [0-9]" << std::endl;
+		return;
 	}
 	
 	switch( op ) {
-	case asn:  kilo::assign(vars.vs, v1, v2); break;
-	case add:  kilo::add(vars.vs, v1, v2);    break;
-	case sub:  kilo::sub(vars.vs, v1, v2);    break;
-	case none: /* ignore */                   break;
+	case adda: kilo::add(vars.vs, v1, v2); break;
+	case suba: kilo::sub(vars.vs, v1, v2); break;
+	case asn: case no_bin: /* handled above --ignore */ break;
 	}
 	
 	vars.print(v1);
