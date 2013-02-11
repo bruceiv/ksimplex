@@ -1,12 +1,14 @@
 /**
  * Simple host-side calculator to test kilomp library.
  * 
- * Command syntax:
- * cmd       := var '=' var        # assign variable to other variable
- *            | var '=' hexstring  # assign hex value to variable
+ * Command syntax (one command per line):
+ * cmd       := var ':' var        # assign variable to other variable
+ *            | var ':' hexstring  # assign hex value to variable
  *            | var                # print variable
  *            | "swap" var var     # swap two variables
  *            | "neg" var          # negate a variable
+ *            | var '+' var        # add second variable to first
+ *            | var '-' var        # subtract second variable from first
  * var       := '$' [0-9]
  * hexstring := '-'? [0-9A-Fa-f]+
  * 
@@ -61,6 +63,28 @@ struct mp_vars {
 		std::cout << buf << std::endl;
 	}
 }; /* struct mp_vars */
+
+/** operator enum */
+enum oper {
+	asn,  /**< assignment operator */
+	
+	add,  /**< addition operator */
+	sub,  /**< subtraction operator */
+	
+	none  /**< invalid operator */
+}; /* enum oper */
+
+/** @return operator corresponding to s */
+oper get_oper(const std::string& s) {
+	using std::string;
+	
+	if ( s == string("=") ) return asn;
+	
+	else if ( s == string("+") ) return add;
+	else if ( s == string("-") ) return sub;
+	
+	else return none;
+}
 
 /** Failure flag for variable parsing */
 kilo::u32 not_var = -1;
@@ -163,35 +187,47 @@ void parse_cmd(std::string line, mp_vars& vars) {
 	}
 	
 	in >> s;
-	if ( s == std::string("=") ) {
-		//handle assignment op
-		if ( in.eof() ) {
-			std::cerr << "Expected operand to '='" << std::endl;
-			return;
-		}
-		
-		in >> s;
-		
-		if ( ! in.eof() ) {
-			std::cerr << "Too many arguments - expected nothing after `" << s << "'" << std::endl;
-			return;
-		}
-		
-		v2 = parse_var(s);
-		if ( v2 == not_var ) {
-			//assign constant
-			vars.parse(v1, s);
-		} else {
-			//assign variable
-			kilo::assign(vars.vs, v1, v2);
-		}
-		
-		vars.print(v1);
-		return;
-	} else {
-		std::cerr << "`" << s << "' is not an operator - expects '='" << std::endl;
+	oper op = get_oper(s);
+	
+	//handle invalid operator
+	if ( op == none ) {
+		std::cerr << "`" << s << "' is not an operator - expects `:', `+', or `-'" << std::endl;
 		return;
 	}
+	
+	if ( in.eof() ) {
+		std::cerr << "Expected operand to `" << s << "'" << std::endl;
+		return;
+	}
+	
+	in >> s;
+	
+	if ( ! in.eof() ) {
+		std::cerr << "Too many arguments - expected nothing after `" << s << "'" << std::endl;
+		return;
+	}
+	
+	v2 = parse_var(s);
+	if ( v2 == not_var ) {
+		if ( op == asn ) {
+			//assign constant
+			vars.parse(v1, s);
+			vars.print(v1);
+			return;
+		} else {
+			std::cerr << "`" << s << "' is not a variable - expects '$' [0-9]" << std::endl;
+			return;
+		}
+	}
+	
+	switch( op ) {
+	case asn:  kilo::assign(vars.vs, v1, v2); break;
+	case add:  kilo::add(vars.vs, v1, v2);    break;
+	case sub:  kilo::sub(vars.vs, v1, v2);    break;
+	case none: /* ignore */                   break;
+	}
+	
+	vars.print(v1);
 }
 
 /** Parses input one line at a time until EOF */

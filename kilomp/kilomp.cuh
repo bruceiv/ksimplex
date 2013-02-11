@@ -55,6 +55,12 @@ inline s32 sign(const mpv v, u32 i) {
 	return ( u > 0 ) - ( u < 0 );
 }
 
+/** @return do the i'th and j'th elements of v have the same sign */
+inline bool same_sign(const mpv v, u32 i, u32 j) {
+	//test that the high bits of the sign fields are the same
+	return (((v[0][i] ^ v[0][j]) & 0x80000000) == 0);
+}
+
 /** @return is the i'th element of v zero? */
 inline bool is_zero(const mpv v, u32 i) {
 	return v[0][i] == 0;
@@ -144,12 +150,7 @@ DEVICE_HOST void assign(mpv v, u32 i, u32 j) {
 	for (u32 k = 0; k <= nl; ++k) { v[k][i] = v[k][j]; }
 }
 
-/**
- * Swaps the values in two slots
- * @param v			The vector
- * @param i			One slot
- * @param j			The other slot
- */
+/** Swaps the i'th and j'th elements of v */
 DEVICE_HOST void swap(mpv v, u32 i, u32 j) {
 	u32 nl = size(v, i);
 	u32 nj = size(v, j);
@@ -162,6 +163,181 @@ DEVICE_HOST void swap(mpv v, u32 i, u32 j) {
 /** Negates the i'th element of v */
 DEVICE_HOST void neg(mpv v, u32 i) {
 	v[0][i] = -(static_cast<s32>(v[0][i]));
+}
+
+/** @return is abs(i'th element of v) >= abs(j'th element of v) */
+DEVICE_HOST bool cmpu(mpv v, u32 i, u32 j) {
+	u32 i_len = size(v, i), j_len = size(v, j);
+	
+	//different lengths
+	if ( i_len > j_len ) return true;
+	else if ( i_len < j_len ) return false;
+	
+	//same length
+	for (u32 k = i_len; k > 0; --k) {
+		if ( v[k][i] == v[k][j] ) continue;
+		else if ( v[k][i] > v[k][j] ) return true;
+		else /* if ( v[k][i] < v[k][j] ) */ return false;
+	}
+	
+	//elements are equal
+	return true;
+}
+
+namespace {
+/** 
+ * Addition function - (i'th element of v) += (j'th element of v).
+ * @param v		The vector
+ * @param i		The index of the first operand (if fewer limbs than n, the extras should be 
+ * 				zeroed)
+ * @param j		The index of the second operand
+ * @param n		Number of limbs in v[j]
+ * @return the carry bit from the last addition
+ */
+DEVICE_HOST static u32 add_l(mpv v, u32 i, u32 j, u32 n) {
+	u32 c = 0;
+	for (u32 k = 1; k <= n; ++k) {
+		u32 t = v[k][i] + v[k][j];                 //overflow iff v[k][i] > t
+		v[k][i] = t + c;                           //overflow iff t = 2**32 - 1 and c = 1
+		c = (t < v[k][i]) | (c & (v[k][i] == 0));  //check overflow
+	}
+	return c;
+}
+
+/**
+ * Subtraction function - (r'th element of v) = (i'th element of v) - (j'th element of v).
+ * @param v		The vector
+ * @param r		The index of the result (if fewer limbs than n, the extras should be zeroed)
+ * @param i		The index of the first operand
+ * @param j		The index of the second operand
+ * @param n		Number of limbs in v[j]
+ * @return the borrow bit from the last subtraction
+ */
+DEVICE_HOST static u32 sub_l(mpv v, u32 r, u32 i, u32 j, u32 n) {
+	int b = 0;
+	for (u32 k = 1; k <= n; ++k) {
+		u32 t = v[k][i] - v[k][j];           //underflow iff t > v[k][i]
+		v[k][r] = t - b;                     //underflow if t = 0 and b = 1
+		b = (t > v[k][i]) | (b & (t == 0));  //check underflow
+	}
+	return b;
+}
+} /* unnamed */
+
+/** 
+ * Adds the j'th element of v to the i'th element of v.
+ * Assumes there are enough limbs allocated in v to hold the result of the addition; 
+ * max{size(v, i), size(v, j)} + 1 will do.
+ * @return the number of limbs used by the i'th element of v after addition
+ */
+DEVICE_HOST static u32 add(mpv v, u32 i, u32 j) {
+	
+	if ( same_sign(v, i, j) ) { //same sign, add
+		
+		u32 len = size(v, i), that_len = size(v, j);
+	
+		//ensure extra limbs are zeroed
+		u32 k = len+1;
+		for (; k <= that_len; ++k) { v[k][i] = 0; }
+		
+		//add
+		u32 c = add_l(v, i, j, that_len);
+		//propegate carry
+		k = that_len+1;
+		for (; k <= len; ++k) {
+			v[k][i] += c;
+			c &= (v[k][i] == 0);
+		}
+		v[k][i] = c;
+		
+		//reset length -- k, accounting for the possibility of no carry, with the previous sign
+		u32 r = k - (c == 0);
+		v[0][i] = r * sign(v, i);
+		return r;
+		
+	} else {  //opposite signs, subtract
+		
+		u32 g, l;  //greater and lesser magnitude indices
+		if ( cmpu(v, i, j) ) {
+			g = i; l = j;
+		} else {
+			g = j; l = i;
+		}
+		u32 g_len = size(v, g), l_len = size(v, l);
+		
+		//subtract
+		u32 b = sub_l(v, i, g, l, l_len);
+		//propegate borrow (will not overflow, by construction)
+		for (u32 k = l_len+1; k <= g_len; ++k) {
+			v[k][i] = v[k][g] - b;
+			b &= (v[k][i] == 0xFFFFFFFF);
+		}
+		
+		//reset length -- highest non-zero limb, with sign of greater element
+		u32 r = g_len;
+		while ( r > 0 && v[r][i] == 0 ) { --r; }
+		v[0][i] = r * sign(v, g);
+		return r;
+	}
+}
+
+/** 
+ * Subtracts the j'th element of v from the i'th element of v.
+ * Assumes there are enough limbs allocated in v to hold the result of the subtraction; 
+ * max{size(v, i), size(v, j)} + 1 will do.
+ * @return the number of limbs used by the i'th element of v after subtraction
+ */
+DEVICE_HOST static u32 sub(mpv v, u32 i, u32 j) {
+	
+	if ( same_sign(v, i, j) ) { //same sign, subtract
+		
+		u32 g, l;  //greater and lesser magnitude indices
+		if ( cmpu(v, i, j) ) {
+			g = i; l = j;
+		} else {
+			g = j; l = i;
+		}
+		u32 g_len = size(v, g), l_len = size(v, l);
+		
+		//subtract
+		u32 b = sub_l(v, i, g, l, l_len);
+		//propegate borrow (will not overflow, by construction)
+		for (u32 k = l_len+1; k <= g_len; ++k) {
+			v[k][i] = v[k][g] - b;
+			b &= (v[k][i] == 0xFFFFFFFF);
+		}
+		
+		//reset length -- highest non-zero limb, with sign of the i'th element or the negation 
+		// of the sign of the j'th element, depending which was greater
+		u32 r = g_len;
+		while ( r > 0 && v[r][i] == 0 ) { --r; }
+		v[0][i] = r * ( ((g == i) * sign(v, i)) + ((g == j) * -1 * sign(v, j)) );
+		return r;
+		
+	} else {  //opposite signs, add
+		
+		u32 len = size(v, i), that_len = size(v, j);
+	
+		//ensure extra limbs are zeroed
+		u32 k = len+1;
+		for (; k <= that_len; ++k) { v[k][i] = 0; }
+		
+		//add
+		u32 c = add_l(v, i, j, that_len);
+		//propegate carry
+		k = that_len+1;
+		for (; k <= len; ++k) {
+			v[k][i] += c;
+			c &= (v[k][i] == 0);
+		}
+		v[k][i] = c;
+		
+		//reset length -- k, accounting for the possibility of no carry, with the previous sign
+		u32 r = k - (c == 0);
+		v[0][i] = r * sign(v, i);
+		return r;
+		
+	}
 }
 
 namespace {
