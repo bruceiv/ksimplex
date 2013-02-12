@@ -4,9 +4,8 @@
  * Main header for Kilo Multi-Precision Integer project.
  * Defines basic type (interleaved array of mp-ints), and operations on elements of that array.
  * 
- * By convention, arithmetic operations all take two index parameters, assigning the result to the 
- * first parameter; the caller is responsible for ensuring the vector is expanded to a sufficiently 
- * large number of limbs.
+ * The algorithms contained herein are largely derived from Knuth's Art of Programming; all but the 
+ * division algorithm should be quite straightforward though.
  * 
  * @author Aaron Moss
  */
@@ -250,6 +249,119 @@ DEVICE_HOST static void mul_l(mpv v, u32 r, u32 i, u32 j, u32 n, u32 m) {
 			c = static_cast<u32>(uv >> 32);                   //put high-order bits in carry
 		}
 		v[k+n+1][r] = c;  //store last carry in result
+	}
+}
+
+/**
+ * Single-limb division function - (r'th element of v) = (i'th element of v) / y
+ * @param v		The vector
+ * @param r		The index of the result
+ * @param i		The index of the dividend
+ * @param y		The divisior
+ * @param n		The number of limbs in the i'th element of v (should be >= 1)
+ * @return the remainder of the division
+ */
+DEVICE_HOST static limb div1_l(mpv v, u32 r, u32 i, limb y, u32 n) {
+	u32 c = 0;
+	u64 t;
+	for (u32 k = n; k > 0; --k) {
+		t = c; t <<= 32; t |= v[k][i];  //setup two limb temporary
+		v[k][r] = (t / y);              //divide through
+		c = (t % y);                    //propegate remainder
+	}
+	return c;
+}
+
+/** 
+ * Multi-limb division function - (r'th element of v) = (i'th element of v) / (j'th element of v).
+ * @param v		The vector
+ * @param r		The index of the result (should be initially zeroed) (may NOT alias i or j)
+ * @param i		The index of the dividend - will store remainder after computation
+ * @param j		The index of the divisor
+ * @param n		The number of limbs in the i'th element of v (should be >= m)
+ * @param m		The number of limbs in the j'th element of v (should be >= 2, use div1_l otherwise)
+ */
+DEVICE_HOST static void divn_l(mpv v, u32 r, u32 i, u32 j, u32 n, u32 m) {
+	u32 o = n - m;
+	
+	//normalize there is a 1 in the high bit of the j'th element of v
+	
+	//d to contain the index of the current high bit of the j'th element of v
+	u32 h = v[m][j];
+	u32 d = (h > 0xFFFF) << 4; h >>= d;  //account for high bit in top 16 bits
+	u32 s = (h > 0xFF  ) << 3; h >>= s; d |= s;  //         ... in remaining top 8 bits
+	    s = (h > 0xF   ) << 2; h >>= s; d |= s;  //         ... in remaining top 4 bits
+	    s = (h > 0x3   ) << 1; h >>= s; d |= s;  //         ... in remaining top 2 bits
+	                                    d |= (h >> 1);  //  ... in remaining bit
+	d = 31 - d;  //how many bits to shift for normalization
+	
+	//normalize i'th and j'th elements by given amount
+	if ( d > 0 ) {
+		lsh_l(v, i, d, n);
+		lsh_l(v, j, d, m);
+	}
+	
+	//divide first m digits of the dividend by the divisor
+	for (u32 k = o; k >= 0; --k) {
+		//determine trial quotient qh
+		u32 qh, rh;
+		u64 t1, t2, t3;
+		if ( v[k+m+1][i] == v[m][j] ) {
+			qh = 0xFFFFFFFF;
+		} else {
+			t1 = v[k+m+1][i]; t1 <<= 32; t1 |= v[k+m][i];
+			qh = t1 / v[m][j];
+			rh = t1 % v[m][j];
+			
+			t2 = v[m-1][j]; t2 *= qh;
+			t3 = rh; t3 <<= 32; t3 |= v[k+m-1][i];
+			while ( t2 > t3 ) {
+				//update trial quotient if needed - will run at most twice (?)
+				--qh;
+				if ( rh + v[m][j] < rh ) break;
+				rh += v[m][j];
+				
+				t2 = v[m-1][j]; t2 *= qh;
+				t3 = rh; t3 <<= 32; t3 |= v[k+m-1][i];
+			}
+		}
+		
+		//replace dividend by remainder of division by qh * divisor
+		u32 b = 0, c = 0;
+		for (u32 l = 1; l <= m; ++l) {
+			t1 = qh; t1 *= v[l][j]; t1 += b;
+			c = (t1 & 0xFFFFFFFF);
+			b = (t1 >> 32);
+			
+			if (v[k+l][i] < c) ++b;
+			
+			v[k+l][i] -= c;
+		}
+		
+		if ( b > v[k+m+1][i] ) {
+			//check case where qh was 1 too big (if so, add a divisor back in)
+			x[k+m+1][i] -= b;
+			qh--;
+			
+			c = 0;
+			for (u32 k_a = k+1; k_a <= m+k; ++k_a) {
+				u32 t_a = v[k_a][i] + v[k_a][j];
+				v[k_a][i] = t_a + c;
+				c = (t_a < v[k_a][i]) | (c & (v[k_a][i] == 0));
+			}
+			//ignore final carry, it cancels the borrow from earlier
+		} else {
+			v[k+m+1][i] -= b;
+		}
+		
+		//store final quotient
+		v[k+1] = qh;
+	}
+	
+	//un-normalize i'th and j'th elements
+	if ( d > 0 ) {
+		rsh(v, i, d, n+1);
+		rsh(v, j, d, m);
 	}
 }
 
