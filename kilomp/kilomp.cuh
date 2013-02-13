@@ -272,6 +272,67 @@ DEVICE_HOST static limb div1_l(mpv v, u32 r, u32 i, limb y, u32 n) {
 	return c;
 }
 
+/**
+ * Left-shift function - (i'th element of v) <<= s
+ * @param v		The vector
+ * @param i		The index of the value to shift
+ * @param s		The amount to shift by
+ * @param n		The number of limbs in the i'th element of v
+ */
+DEVICE_HOST static void lsh_l(mpv v, u32 i, u32 s, u32 n) {
+	u32 s_l = s >> 5;    // (s / 32) -- number of limbs to shift
+	u32 s_b = s & 0x1F;  // (s % 32) -- number of bits to shift
+	
+	u32 u_s = 32 - s_b;  // amount to "un-shift" high bits
+	u32 mask = ((1 << s_b) - 1) << u_s;  //mask for high bits
+	
+	u32 prev, next;
+	prev = next = v[n][i];
+	//set new high limb
+	v[n+s_l+1][i] = (next & mask) >> u_s;
+	//shift remaining limbs
+	for (u32 k = n; k > 1; --k) {
+		next = v[k-1][i];
+		//get low order bits of current limb, then high order bits of next limb back
+		v[k+s_l][i] = (prev << s_b) | ((next & mask) >> u_s);
+		prev = next;
+	}
+	//set new low limb
+	v[s_l+1][i] = prev << s_b;
+	
+	//zero low-order limbs
+	for (u32 k = s_l; k > 0; --k) { v[k][i] = 0; }
+}
+
+/**
+ * Right-shift function - (i'th element of v) >>= s
+ * @param v		The vector
+ * @param i		The index of the value to shift
+ * @param s		The amount to shift by
+ * @param n		The number of limbs in the i'th element of v
+ */
+ DEVICE_HOST static void rsh_l(mpv v, u32 i, u32 s, u32 n) {
+	u32 s_l = s >> 5;    // (s / 32) -- number of limbs to shift
+	u32 s_b = s & 0x1F;  // (s % 32) -- number of bits to shift
+	
+	u32 u_s = 32 - s_b;  //amount to "un-shift" low bits
+	u32 mask = (1 << s_b) - 1;  //mask for low bits
+	
+	u32 prev, next;
+	prev = v[1+s_l][i];
+	//right shift limbs
+	for (u32 k = 1; k < n-s_l; ++k) {
+		next = v[k+1+s_l][i];
+		v[k][i] = ((next & mask) << u_s) | (prev >> s_b);
+		prev = next;
+	}
+	//set new high limb
+	v[n-s_l][i] = prev >> s_b;
+	
+	//zero high-order limbs
+	for (u32 k = n-s_l+1; k <= n; ++k) { v[k][i] = 0; }
+ }
+
 /** 
  * Multi-limb division function - (r'th element of v) = (i'th element of v) / (j'th element of v).
  * @param v		The vector
@@ -360,8 +421,8 @@ DEVICE_HOST static void divn_l(mpv v, u32 r, u32 i, u32 j, u32 n, u32 m) {
 	
 	//un-normalize i'th and j'th elements
 	if ( d > 0 ) {
-		rsh(v, i, d, n+1);
-		rsh(v, j, d, m);
+		rsh_l(v, i, d, n+1);
+		rsh_l(v, j, d, m);
 	}
 }
 
