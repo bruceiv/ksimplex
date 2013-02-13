@@ -319,11 +319,11 @@ DEVICE_HOST static void lsh_l(mpv v, u32 i, u32 s, u32 n) {
 	u32 mask = (1 << s_b) - 1;  //mask for low bits
 	
 	u32 prev, next;
-	prev = v[1+s_l][i];
+	prev = v[s_l+1][i];
 	//right shift limbs
-	for (u32 k = 1; k < n-s_l; ++k) {
-		next = v[k+1+s_l][i];
-		v[k][i] = ((next & mask) << u_s) | (prev >> s_b);
+	for (u32 k = s_l+1; k < n; ++k) {
+		next = v[k+1][i];
+		v[k-s_l][i] = ((next & mask) << u_s) | (prev >> s_b);
 		prev = next;
 	}
 	//set new high limb
@@ -570,6 +570,43 @@ DEVICE_HOST static u32 mul(mpv v, u32 r, u32 i, u32 j) {
 	v[0][r] = l;
 	if ( ! same_sign(v, i, j) ) v[0][r] *= -1;
 	return l;
+}
+
+/** 
+ * Divides the i'th element of v by the j'th element, storing the result in the r'th element and 
+ * the remainder in the i'th element.
+ * Purposely throws a divide by zero error if the j'th element is zero. Assumes there are enough 
+ * limbs allocated in v to perform the calculation; size(v, i) + 1 will do.
+ * @return the number of limbs used by the r'th element of v after subtraction
+ */
+DEVICE_HOST static u32 div(mpv v, u32 r, u32 i, u32 j) {
+	u32 n = size(v, i), m = size(v, j), l;
+	
+	//divide by zero
+	if ( m == 0 ) return 1/m;
+	
+	//j'th element > i'th element
+	if ( m > n ) {
+		v[0][r] = 0;  //set quotient to zero
+		              //all remainder, so remainder stays the same
+		return;
+	}
+	
+	if ( m == 1 ) {  //single-limb division
+		v[1][i] = div1_l(m, r, i, v[1][j], n);
+		
+		l = (v[1][i] != 0);  //length of remainder -- 1 for non-zero limb, 0 otherwise
+	} else {  //multi-limb division
+		divn_l(v, r, i, j, n, m);
+		
+		for (l = m; l > 0 && v[l][i] == 0; --l) {}  //length of remainder -- top non-zero limb
+	}
+	
+	//reset quotient length
+	v[0][r] = (n-m) + (v[n-m+1][r] != 0);  //n-m, accounting for possibility of non-zero high limb
+	if ( ! same_sign(v, i, j) ) v[0][r] *= -1;  //with correct sign
+	//reset remainder length
+	v[0][i] = l * sign(v, i);  //remainder length, with correct sign
 }
 
 namespace {
