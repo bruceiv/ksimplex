@@ -11,6 +11,8 @@
  *            | var '+=' var         # add second variable to first
  *            | var '-=' var         # subtract second variable from first
  *            | var '=' var '*' var  # set first variable to the product of second and third
+ *            | var '=' var '/' var  # set first variable to quotient of second and third
+ *                                   # - remainder will be stored in second variable
  * var       := '$' [0-9]
  * hexstring := '-'? [0-9A-Fa-f]+
  * 
@@ -79,6 +81,7 @@ enum bin_op {
 /** ternary operator enum */
 enum tri_op {
 	mul,    /**< multiplication */
+	dvn,	/**< division */
 	
 	no_tri  /**< invalid operator */
 }; /* enum tri_op */
@@ -100,6 +103,7 @@ tri_op get_tri_op(const std::string& s) {
 	using std::string;
 	
 	if ( s == string("*") ) return mul;
+	else if ( s == string("/") ) return dvn;
 	
 	else return no_tri;
 }
@@ -263,7 +267,7 @@ void parse_cmd(std::string line, mp_vars& vars) {
 		in >> s;
 		tri_op op2 = get_tri_op(s);
 		if ( op2 == no_tri ) {
-			std::cerr << "`" << s << "' is not an operator - expects `*'" << std::endl;
+			std::cerr << "`" << s << "' is not an operator - expects `*' or '/'" << std::endl;
 			return;
 		}
 		
@@ -281,6 +285,7 @@ void parse_cmd(std::string line, mp_vars& vars) {
 		
 		switch( op2 ) {
 		case mul: kilo::mul(vars.vs, v1, v2, v3); break;
+		case dvn: kilo::div(vars.vs, v1, v2, v3); break;
 		case no_tri: /* handled above -- ignore */ break;
 		}
 		

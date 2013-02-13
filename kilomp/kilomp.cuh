@@ -401,7 +401,7 @@ DEVICE_HOST static void divn_l(mpv v, u32 r, u32 i, u32 j, u32 n, u32 m) {
 		
 		if ( b > v[k+m+1][i] ) {
 			//check case where qh was 1 too big (if so, add a divisor back in)
-			x[k+m+1][i] -= b;
+			v[k+m+1][i] -= b;
 			qh--;
 			
 			c = 0;
@@ -416,7 +416,7 @@ DEVICE_HOST static void divn_l(mpv v, u32 r, u32 i, u32 j, u32 n, u32 m) {
 		}
 		
 		//store final quotient
-		v[k+1] = qh;
+		v[k+1][r] = qh;
 	}
 	
 	//un-normalize i'th and j'th elements
@@ -580,7 +580,7 @@ DEVICE_HOST static u32 mul(mpv v, u32 r, u32 i, u32 j) {
  * @return the number of limbs used by the r'th element of v after subtraction
  */
 DEVICE_HOST static u32 div(mpv v, u32 r, u32 i, u32 j) {
-	u32 n = size(v, i), m = size(v, j), l;
+	u32 n = size(v, i), m = size(v, j), q_l, r_l;
 	
 	//divide by zero
 	if ( m == 0 ) return 1/m;
@@ -589,24 +589,27 @@ DEVICE_HOST static u32 div(mpv v, u32 r, u32 i, u32 j) {
 	if ( m > n ) {
 		v[0][r] = 0;  //set quotient to zero
 		              //all remainder, so remainder stays the same
-		return;
+		return 0;
 	}
 	
 	if ( m == 1 ) {  //single-limb division
-		v[1][i] = div1_l(m, r, i, v[1][j], n);
+		v[1][i] = div1_l(v, r, i, v[1][j], n);
 		
-		l = (v[1][i] != 0);  //length of remainder -- 1 for non-zero limb, 0 otherwise
+		r_l = (v[1][i] != 0);  //length of remainder
 	} else {  //multi-limb division
 		divn_l(v, r, i, j, n, m);
 		
-		for (l = m; l > 0 && v[l][i] == 0; --l) {}  //length of remainder -- top non-zero limb
+		for (r_l = m; r_l > 0 && v[r_l][i] == 0; --r_l) {}  //length of remainder
 	}
 	
 	//reset quotient length
-	v[0][r] = (n-m) + (v[n-m+1][r] != 0);  //n-m, accounting for possibility of non-zero high limb
+	q_l = (n-m) + (v[n-m+1][r] != 0);  //n-m, accounting for possibility of non-zero high limb
+	v[0][r] = q_l;
 	if ( ! same_sign(v, i, j) ) v[0][r] *= -1;  //with correct sign
 	//reset remainder length
-	v[0][i] = l * sign(v, i);  //remainder length, with correct sign
+	v[0][i] = r_l * sign(v, i);  //remainder length, with correct sign
+	
+	return q_l;
 }
 
 namespace {
