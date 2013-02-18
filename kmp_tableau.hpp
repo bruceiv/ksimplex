@@ -12,17 +12,21 @@ namespace ksimplex {
 
 class kmp_tableau {
 private:  //internal convenience functions
+	
+	/** @return index of the determinant */
+	static const u32 det = 0;
+	
 	/** @return index of j'th objective function coefficient (j >= 1) */
-	u32 obj(u32 j) { return j+1; }
+	inline u32 obj(u32 j) const { return j+1; }
 	
 	/** @return index of constant coefficient of i'th row (i >= 1) */
-	u32 con(u32 i) { return i*(d+1)+1; }
+	inline u32 con(u32 i) const { return i*(d+1)+1; }
 	
 	/** @return index of j'th coefficient of i'th row (i, j >= 1) */
-	u32 elm(u32 i, u32 j) { return i*(d+1)+j+1; }
+	inline u32 elm(u32 i, u32 j) const { return i*(d+1)+j+1; }
 	
 	/** @return index of x'th temp variable (x >= 1) */
-	u32 tmp(u32 x) { return (n+1)*(d+1)+x; }
+	inline u32 tmp(u32 x) const { return (n+1)*(d+1)+x; }
 	
 	/** Ensures at least a_n limbs are allocated in the matrix */
 	void ensure_limbs(u32 a_n) {
@@ -30,6 +34,11 @@ private:  //internal convenience functions
 			m = kilo::expand(m, m_l, a_l, a_n);
 			a_l = a_n;
 		}
+	}
+	
+	/** Ensures used limb counter is at least as high as u_n */
+	void count_limbs(u32 u_n) {
+		if ( u_n > u_l ) { u_l = u_n; }
 	}
 public:	 //public interface
 	
@@ -74,13 +83,13 @@ public:	 //public interface
 				} else {  // Test against previous leaving variable
 					i = b[iL];
 					
-					//compute ratio
+					//compute ratio: rat = M[iMin, 0] * M[iL, jE] <=> M[iL, 0] * M[iMin, jE]
 					kilo::mul(m, t1, con(iMin), elm(iL, jE));
 					kilo::mul(m, t2, con(iL), elm(iMin, jE));
 					s32 rat = kilo::cmp(m, t1, t2);
 					
 					//test ratio
-					if ( rat < 0 || ( rat == 0 && i < leave ) ) {
+					if ( rat == -1 || ( rat == 0 && i < leave ) ) {
 						iMin = iL;
 						leave = i;
 					}
@@ -93,6 +102,70 @@ public:	 //public interface
 		
 		// Return pivot
 		return pivot(enter, leave);
+	}
+	
+	/** 
+	 * Pivots the tableau from one basis to another.
+	 * The caller is responsible to ensure that this is a valid pivot (i.e. the given entering 
+	 * variable is cobasic, leaving variable is basic, and coefficient of the entering variable in 
+	 * the equation defining the leaving variable is non-zero).
+	 * 
+	 * @param enter		The index to enter the basis
+	 * @param leave		The index to leave the basis
+	 */
+	void doPivot(u32 enter, u32 leave) {
+		u32 iL = row[leave];  // Leaving row
+		u32 jE = col[enter];  // Entering column
+		
+		u32 i, j;
+		u32 t1 = tmp(1);
+		
+		ensure_limbs(u_l*2);       // Make sure enough space in temp variables
+		
+		// Keep sign of M[iL,jE] in det
+		u32 Mij = elm(iL, jE);
+		if ( kilo::is_neg(m, Mij) ) { kilo::neg(m, det); }
+		
+		// Recalculate matrix elements outside of pivot row/column
+		for (i = 0; i <= n; ++i) {
+			if ( i == iL ) continue;
+			
+			u32 Mi = elm(i, jE);
+			for (j = 0; j <= d; ++j) {
+				if ( j == jE ) continue;
+				
+				u32 Eij = elm(i, j);
+				
+				// M[i,j] = ( M[i,j]*M[iL,jE] - M[i,jE]*M[iL,j] )/det
+				kilo::mul(m, t1, Eij, Mij);
+				kilo::mul(m, Eij, Mi, elm(iL, j));
+				kilo::sub(m, t1, Eij);
+				count_limbs(kilo::div(m, Eij, t1, det));  //store # of limbs
+			}
+		}
+		
+		// Recalculate pivot row/column
+		if ( kilo::is_pos(m, Mij) ) {
+			for (j = 0; j <= d; ++j) {
+				kilo::neg(m, elm(iL, j));
+			}
+		} else { // M[iL,jE] < 0 -- == 0 case is ruled out by pre-assumptions
+			for (i = 0; i <= n; ++i) {
+				kilo::neg(m, elm(i, JE));
+			}
+		}
+		
+		// Reset pivot element, determinant
+		kilo::swap(m, det, Mij);
+		if ( kilo::is_neg(m, det) ) { kilo::neg(m, det); }
+		
+		// Fix basis, cobasis, row, and column
+		b[iL] = enter;
+		c[jE] = leave;
+		row[leave] = 0;
+		row[enter] = iL;
+		col[enter] = 0;
+		col[leave] = jE;
 	}
 	
 private:  //class members
