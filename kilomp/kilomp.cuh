@@ -164,6 +164,16 @@ DEVICE_HOST void neg(mpv v, u32 i) {
 	v[0][i] = -(static_cast<s32>(v[0][i]));
 }
 
+/** Zeros the i'th element of v */
+DEVICE_HOST void set_zero(mpv v, u32 i) {
+	v[0][i] = 0;
+}
+
+/** Sets the i'th element of v to 1 (assumes there are data limbs allocated) */
+DEVICE_HOST void set_one(mpv v, u32 i) {
+	v[0][i] = 1; v[1][i] = 1;
+}
+
 /** @return is abs(i'th element of v) >= abs(j'th element of v) */
 DEVICE_HOST bool cmpu(mpv v, u32 i, u32 j) {
 	u32 i_len = size(v, i), j_len = size(v, j);
@@ -181,6 +191,32 @@ DEVICE_HOST bool cmpu(mpv v, u32 i, u32 j) {
 	
 	//elements are equal
 	return true;
+}
+
+/** 
+ * Compares i'th and j'th elements of v.
+ * @return 0 for equal, 1 for i'th > j'th, -1 for i'th < j'th
+ */
+DEVICE_HOST s32 cmp(mpv v, u32 i, u32 j) {
+	//compare number of limbs (signed)
+	s32 l_d = static_cast<s32>(v[0][i]) - static_cast<s32>(v[0][j]);
+	if ( l_d > 0 ) {  //i'th is more positive or less negative by at least a limb
+		return 1;
+	} else if ( l_d < 0 ) {  //i'th is less positive or more negative by at least a limb
+		return -1;
+	}
+	
+	//compare magnitudes - the values have the same sign and have the same number of limbs, but we 
+	// need to account properly for the sign (greater magnitude negative is less-than, greater 
+	// magnitude positive is greater-than)
+	for (u32 k = size(v, i); k > 0; --k) {
+		if ( v[k][i] == v[k][j] ) continue;
+		else if ( v[k][i] > v[k][j] ) return sign(v, i);
+		else /* if ( v[k][i] < v[k][j] ) */ return -sign(v, i);
+	}
+	
+	//elements are equal
+	return 0;
 }
 
 namespace {

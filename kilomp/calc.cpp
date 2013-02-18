@@ -8,6 +8,7 @@
  *            | "swap" var var       # swap two variables
  *            | "neg" var            # negate a variable
  *            | "size" var           # print number of limbs in a variable
+ *            | "cmp" var var        # compare two variables
  *            | var '+=' var         # add second variable to first
  *            | var '-=' var         # subtract second variable from first
  *            | var '=' var '*' var  # set first variable to the product of second and third
@@ -212,6 +213,38 @@ void parse_cmd(std::string line, mp_vars& vars) {
 		}
 		
 		std::cout << kilo::size(vars.vs, v1) << std::endl;
+		return;
+	} else if ( s == std::string("cmp") ) {  //handle compare command
+		if ( in.eof() ) {
+			std::cerr << "Expected arguments to `cmp'" << std::endl;
+			return;
+		}
+		
+		in >> s;
+		v1 = parse_var(s);
+		if ( v1 == not_var ) {
+			std::cerr << "`" << s << "' is not a variable - expects '$' [0-9]" << std::endl;
+			return;
+		}
+		
+		if ( in.eof() ) {
+			std::cerr << "Expected second operand to `cmp'" << std::endl;
+			return;
+		}
+		
+		in >> s;
+		v2 = parse_var(s);
+		if ( v2 == not_var ) {
+			std::cerr << "`" << s << "' is not a variable - expects '$' [0-9]" << std::endl;
+			return;
+		}
+		
+		if ( ! in.eof() ) {
+			std::cerr << "Too many arguments - expected nothing after `" << s << "'" << std::endl;
+			return;
+		}
+		
+		std::cout << kilo::cmp(vars.vs, v1, v2) << std::endl;
 		return;
 	}
 	
