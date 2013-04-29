@@ -1,4 +1,4 @@
-# Makefile for the "Simplex Using Multi-Precision" (sump) project.
+# Makefile for the KSimplex project.
 # 
 # @author Aaron Moss (moss.aaron@unb.ca)
 
@@ -47,8 +47,8 @@ lrspp:  sump.hpp sump_io.hpp lrs lrspp.hpp lrspp.cu
 lrs:  
 	cd lrs && make
 
-ksimplex.tar:  
-	tar -czf ksimplex.tar *.cuh *.cu *.hpp *.c Makefile chimp/*.cuh chimp/*.cu chimp/*.cpp chimp/Makefile
+tarball:  
+	cd .. && tar -zcvf ksimplex.tar.gz --exclude ksimplex/.git --exclude ksimplex/.gitignore ksimplex/
 
 clean:  
 	-rm $(OBJS) sump zsump
