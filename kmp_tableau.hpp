@@ -289,6 +289,9 @@ public:	 //public interface
 		col[enter] = 0;
 		col[leave] = jE;
 	}
+
+	/** Get a read-only matrix copy */
+	const mpv mat() const { return m; }
 	
 private:  //class members
 	u32 n;     ///< number of equations in tableau

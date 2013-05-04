@@ -13,6 +13,8 @@
 
 #include "kilo/kilomp.cuh"
 
+using namespace ksimplex;
+
 /// Number of limbs to initially allocate in the matrix
 static const u32 INIT_ALLOC = 4;
 
@@ -45,6 +47,57 @@ void parse(kilo::mpv m, u32 i, u32 m_l, u32& a_l, u32& u_l, std::istream& in) {
 }
 
 /**
+ * Reads a matrix from input
+ * 
+ * @param m			The matrix to read in to
+ * @param n			The number of rows in the matrix (not counting objective)
+ * @param d			The number of columns in the matrix (not counting constant)
+ * @param a_l		The number of currently allocated limbs (may be updated)
+ * @param u_l		The number of currently used limbs (may be updated)
+ * @param in		The stream to read from
+ */
+void parseMatrix(kilo::mpv m, u32 n, u32 d, u32& a_l, u32& u_l, 
+                 std::istream& in) {
+	u32 m_l = 1 + (n+1)+(d+1);
+	for (u32 i = 1; i < m_l; ++i) { parse(mat, i, m_l, a_l, u_l, std::cin); }
+}
+
+/**
+ * Prints a vector index.
+ * 
+ * @param m			The vector to print from
+ * @param i			The index in the vector to print from
+ * @param out		The stream to write to
+ */
+void print(const kilo::mpv m, u32 i, std::ostream& out) {
+	//allocate large enough buffer
+	u32 len = kilo::size(m, i);
+	char buf[8*len+2];
+	
+	//print into buffer, then stdout
+	kilo::print(m, i, buf);
+	out << buf;
+}
+
+/**
+ * Prints a matrix.
+ * 
+ * @param m			The vector to print from
+ * @param n			The number of rows in the matrix (not counting objective)
+ * @param d			The number of columns in the matrix (not counting constant)
+ * @param out		The stream to write to
+ */
+void printMatrix(const kilo::mpv m, u32 n, u32 d, std::ostream& out) {
+	for (u32 i = 0; i <= n; ++i) {
+		for (u32 j = 0; j <= d; ++j) {
+			out << " ";
+			print(m, 1 + i*(d+1) + j, out);
+		}
+		out << std::endl;
+	}
+}
+
+/**
  * Simple test driver.
  * 
  * Input (tableau file):
@@ -53,8 +106,6 @@ void parse(kilo::mpv m, u32 i, u32 m_l, u32& a_l, u32& u_l, std::istream& in) {
  * (<tableau_element>{d+1}){n+1}
  */
 int main(int argc, char **argv) {
-	using namespace ksimplex;
-	
 	// Read in size and dimension of the the problem
 	u32 n, d, m_l;
 	std::cin >> n;
@@ -83,12 +134,13 @@ int main(int argc, char **argv) {
 	while ( j <= n+d && c_j <= d ) { cob[c_j] = j; ++c_j; ++j; }
 	
 	// Read in matrix
-	for (u32 i = 1; i < m_l; ++i) { parse(mat, i, m_l, a_l, u_l, std::cin); }
+	parseMatrix(mat, n, d, a_l, u_l, std::cin);
 	
 	// Construct tableau
 	kmp_tableau tab(n, d, a_l, u_l, cob, bas, mat);
 	
-	// TODO Print initial tableau
+	// Print initial tableau
+	printMatrix(tab.mat(), n, d, std::cout);
 	
 	// Run simplex algorithm
 	u32 pivot_count = 0;
@@ -100,7 +152,8 @@ int main(int argc, char **argv) {
 		std::cout << "tableau: UNBOUNDED" << std::endl;
 	}
 	
-	// TODO Print final tableau
+	// Print final tableau
+	printMatrix(tab.mat(), n, d, std::cout);
 	
 	// Cleanup
 	delete[] cob;
