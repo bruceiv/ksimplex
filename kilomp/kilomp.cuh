@@ -101,6 +101,19 @@ DEVICE_HOST mpv init_mpv(u32 n, u32 alloc_l = 4) {
 }
 
 /**
+ * Copies one mp-vector into another.
+ * @param d			The destination vector
+ * @param s			The source vector
+ * @param n			The number of elements in the source vector (the destination vector should be 
+ *                  allocated for at least as many)
+ * @param a_l		The number of data limbs allocated in the source vector (the destination vector 
+ * 					should be allocated for at least as many)
+ */
+DEVICE_HOST void copy(mpv d, mpv s, u32 n, u32 a_l) {
+	for (u32 i = 0; i <= a_l; ++i) for (u32 j = 0; j < n; ++j) { d[i][j] = s[i][j]; }
+}
+
+/**
  * Expands a mp-vector
  * @param v			The vector
  * @param n			The number of elements in the vector

@@ -40,7 +40,129 @@ private:  //internal convenience functions
 	void count_limbs(u32 u_n) {
 		if ( u_n > u_l ) { u_l = u_n; }
 	}
+	
 public:	 //public interface
+	/**
+	 * Default constructor.
+	 * 
+	 * @param n			The number of equations in the tableau
+	 * @param d			The dimension of the underlying space
+	 * @param a_l		The number of limbs allocated in the tableau matrix
+	 * @param u_l		The maximum number of limbs used of any element in the tableau matrix
+	 * @param cob		The indices of the iniital cobasis (should be sorted in increasing order, 
+	 * 					cob[0] = 0 (the constant term))
+	 * @param bas		The indices of the initial basis (should be sorted in increasing order, 
+	 * 					bas[0] = 0 (the objective))
+	 * @param mat		The matrix of the initial tableau (should be organized such that the 
+	 * 					initial determinant is stored at mat[0], and the variable at row i, 
+	 * 					column j is at mat[1+i*d+j], where the 0-row is for the objective function, 
+	 * 					and the 0-column is for the constant terms)
+	 */
+	kmp_tableau(u32 n, u32 d, u32 a_l, u32 u_l, const u32* cob, const u32* bas, mpv mat)
+			: n(n), d(d), a_l(a_l), u_l(u_l), m_l(1 + 2*(n+1)*(d+1)) {
+		
+		// Allocate basis, cobasis, row, column, and matrix storage
+		b = new u32[n+1];
+		c = new u32[d+1];
+		row = new u32[n+d+1];
+		col = new u32[n+d+1];
+		m = kilo::init_mpv(m_l, a_l);
+		
+		u32 i, j, r_i, c_j;
+		
+		// Copy basis and row indices
+		b[0] = 0;
+		r_i = 0;
+		for (i = 1; i <= n; ++i) {
+			b[i] = bas[i];
+			while ( r_i < bas[i] ) row[r_i++] = 0;
+			row[r_i++] = i;
+		}
+		while ( r_i <= n+d ) row[r_i++] = 0;
+		
+		// Copy cobasis and column indices
+		c[0] = 0;
+		c_j = 0;
+		for (j = 1; j <= d; ++j) {
+			c[j] = cob[j];
+			while ( c_j < cob[j] ) col[c_j++] = 0;
+			col[c_j++] = j;
+		}
+		while ( c_j <= n+d ) col[c_j++] = 0;
+		
+		// Copy matrix
+		kilo::copy(m, mat, 1 + (n+1)*(d+1), u_l);
+	}
+	
+	/**
+	 * Copy constructor
+	 * 
+	 * @param o			The tableau to copy
+	 */
+	kmp_tableau(const kmp_tableau& o) : n(o.n), d(o.d), a_l(o.a_l), u_l(o.u_l), m_l(o.m_l) {	
+		// Allocate basis, cobasis, row, column, and matrix storage
+		b = new u32[n+1];
+		c = new u32[d+1];
+		row = new u32[n+d+1];
+		col = new u32[n+d+1];
+		m = kilo::init_mpv(m_l, a_l);
+		
+		// Copy basis, cobasis, row, column, and matrix
+		u32 i;
+		for (i = 0; i <= n; ++i) { b[i] = o.b[i]; }
+		for (i = 0; i <= d; ++i) { c[i] = o.c[i]; }
+		for (i = 0; i <= n+d; ++i) { row[i] = o.row[i]; }
+		for (i = 0; i <= n+d; ++i) { col[i] = o.col[i]; }
+		kilo::copy(m, o.m, 1 + (n+1)*(d+1), u_l);
+	}
+	
+	/** Destructor */
+	~kmp_tableau() {
+		delete[] b;
+		delete[] c;
+		delete[] row;
+		delete[] col;
+		kilo::clear(m, a_l);
+	}
+	
+	/**
+	 * Assignment operator
+	 *
+	 * @param o			The tableau to assign to this one
+	 */
+	kmp_tableau& operator = (const kmp_tableau& o) {
+		// Ensure matrix storage properly sized
+		if ( n == o.n && d == o.d ) {
+			// Matrix sizes are compatible, just ensure enough limbs
+			u_l = o.u_l;
+			ensure_limbs(o.a_l);
+		} else {
+			// Matrix sizes are not the same, rebuild
+			delete[] b;
+			delete[] c;
+			delete[] row;
+			delete[] col;
+			kilo::clear(m, a_l);
+			
+			n = o.n; d = o.d; a_l = o.a_l; u_l = o.u_l; m_l = o.m_l;
+			
+			b = new u32[n+1];
+			c = new u32[d+1];
+			row = new u32[n+d+1];
+			col = new u32[n+d+1];
+			m = kilo::init_mpv(m_l, a_l);
+		}
+		
+		// Copy basis, cobasis, row, column, and matrix
+		u32 i;
+		for (i = 0; i <= n; ++i) { b[i] = o.b[i]; }
+		for (i = 0; i <= d; ++i) { c[i] = o.c[i]; }
+		for (i = 0; i <= n+d; ++i) { row[i] = o.row[i]; }
+		for (i = 0; i <= n+d; ++i) { col[i] = o.col[i]; }
+		kilo::copy(m, o.m, 1 + (n+1)*(d+1), u_l);
+		
+		return *this;
+	}
 	
 	/** 
 	 * Finds the next pivot using Bland's rule.
