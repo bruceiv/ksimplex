@@ -4,7 +4,7 @@
 
 LRSFLAGS = -DTIMES -DGMP -DLRS_QUIET
 # compiler flags
-CXXFLAGS = -O2 -Wall
+CXXFLAGS = -O2 -Wall -Wno-unused-function
 # CUDA compiler flags
 CUDAFLAGS = -O2 -arch=compute_20 -code=sm_21
 # Debug-mode CUDA compiler flags
@@ -25,7 +25,7 @@ OBJS =
 .PHONY:  clean lrs
 
 hksimplex:  kmp_tableau.hpp ksimplex.hpp simplex.hpp kilomp/kilomp.cuh
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o hksimplex ksimplex.hpp $(LDFLAGS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o hksimplex ksimplex.cpp $(LDFLAGS)
 
 lrs:  
 	cd lrs && make

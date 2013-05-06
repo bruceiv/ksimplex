@@ -2,6 +2,8 @@
 
 #include "ksimplex.hpp"
 
+#include "kilomp/kilomp.cuh"
+
 /** 
  * Host-side kilo::mpv based tableau for the KSimplex project.
  * 
@@ -58,7 +60,7 @@ public:	 //public interface
 	 * 					column j is at mat[1+i*d+j], where the 0-row is for the objective function, 
 	 * 					and the 0-column is for the constant terms)
 	 */
-	kmp_tableau(u32 n, u32 d, u32 a_l, u32 u_l, const u32* cob, const u32* bas, mpv mat)
+	kmp_tableau(u32 n, u32 d, u32 a_l, u32 u_l, const u32* cob, const u32* bas, kilo::mpv mat)
 			: n(n), d(d), a_l(a_l), u_l(u_l), m_l(1 + 2*(n+1)*(d+1)) {
 		
 		// Allocate basis, cobasis, row, column, and matrix storage
@@ -273,7 +275,7 @@ public:	 //public interface
 			}
 		} else { // M[iL,jE] < 0 -- == 0 case is ruled out by pre-assumptions
 			for (i = 0; i <= n; ++i) {
-				kilo::neg(m, elm(i, JE));
+				kilo::neg(m, elm(i, jE));
 			}
 		}
 		
@@ -291,22 +293,22 @@ public:	 //public interface
 	}
 
 	/** Get a read-only matrix copy */
-	const mpv mat() const { return m; }
+	const kilo::mpv mat() const { return m; }
 	
 private:  //class members
-	u32 n;     ///< number of equations in tableau
-	u32 d;     ///< dimension of underlying space
+	u32 n;        ///< number of equations in tableau
+	u32 d;        ///< dimension of underlying space
 	
-	u32* b;    ///< basis variables
-	u32* c;    ///< cobasis variables
+	u32* b;       ///< basis variables
+	u32* c;       ///< cobasis variables
 	
-	u32* row;  ///< row indices for variables
-	u32* col;  ///< column indices for variables
+	u32* row;     ///< row indices for variables
+	u32* col;     ///< column indices for variables
 	
-	mpv m;     ///< underlying matrix for tableau
-	u32 a_l;   ///< number of limbs allocated for matrix
-	u32 u_l;   ///< maximum number of limbs used for matrix
-	u32 m_l;   ///< number of elements in the matrix
+	kilo::mpv m;  ///< underlying matrix for tableau
+	u32 a_l;      ///< number of limbs allocated for matrix
+	u32 u_l;      ///< maximum number of limbs used for matrix
+	u32 m_l;      ///< number of elements in the matrix
 }; /* class kmp_tableau */
 
 } /* namespace ksimplex */

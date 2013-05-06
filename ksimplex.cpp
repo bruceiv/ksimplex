@@ -11,7 +11,7 @@
 #include "ksimplex.hpp"
 #include "simplex.hpp"
 
-#include "kilo/kilomp.cuh"
+#include "kilomp/kilomp.cuh"
 
 using namespace ksimplex;
 
@@ -59,7 +59,7 @@ void parse(kilo::mpv m, u32 i, u32 m_l, u32& a_l, u32& u_l, std::istream& in) {
 void parseMatrix(kilo::mpv m, u32 n, u32 d, u32& a_l, u32& u_l, 
                  std::istream& in) {
 	u32 m_l = 1 + (n+1)+(d+1);
-	for (u32 i = 1; i < m_l; ++i) { parse(mat, i, m_l, a_l, u_l, std::cin); }
+	for (u32 i = 1; i < m_l; ++i) { parse(m, i, m_l, a_l, u_l, std::cin); }
 }
 
 /**
