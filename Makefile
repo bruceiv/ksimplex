@@ -2,18 +2,20 @@
 # 
 # @author Aaron Moss
 
-LRSFLAGS = -DTIMES -DGMP -DLRS_QUIET
 # compiler flags
 CXXFLAGS = -O2 -Wall -Wno-unused-function
+# LRS compiler flags
+LRSCXXFLAGS = $(CXXFLAGS) -DTIMES -DGMP -DLRS_QUIET
 # CUDA compiler flags
 CUDAFLAGS = -O2 -arch=compute_20 -code=sm_21
 # Debug-mode CUDA compiler flags
 CUDADEBUGFLAGS = -g -G -DDEBUG_CUDA -arch=compute_20 -code=sm_21 \
 	--ptxas-options="-v"
+
 # Linker flags
 LDFLAGS = 
 #LRS linker flags
-LRSLDFLAGS = -Llrs -llrs -lgmpxx -lgmp
+LRSLDFLAGS = $(LDFLAGS) -Llrs -llrs -lgmpxx -lgmp
 
 # object files to include in this executable
 OBJS = 
@@ -26,6 +28,9 @@ OBJS =
 
 hksimplex:  kmp_tableau.hpp ksimplex.hpp simplex.hpp kilomp/kilomp.cuh
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o hksimplex ksimplex.cpp $(LDFLAGS)
+
+lrspp:  lrspp.cpp lrs ksimplex.hpp
+	$(CXX) $(CPPFLAGS) $(LRSCXXFLAGS) -o lrspp lrspp.cpp $(LRSLDFLAGS)
 
 lrs:  
 	cd lrs && make

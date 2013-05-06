@@ -29,17 +29,15 @@
 /*  Selection of arithmetic package  */
 /*************************************/
 #ifdef LONG
-#define ARITH "lrslong.h"    /* lrs long integer arithmetic package */
+#include "lrslong.h"    /* lrs long integer arithmetic package */
 #else
 #ifdef GMP
-#define ARITH "lrsgmp.h"     /* lrs wrapper for gmp multiple precsion arithmetic    */
+#include "lrsgmp.h"     /* lrs wrapper for gmp multiple precsion arithmetic    */
 #else
-#define ARITH "lrsmp.h"      /* lrs multiple precsion arithmetic    */
+#include "lrsmp.h"      /* lrs multiple precsion arithmetic    */
 #define MP
 #endif
 #endif
-
-#include ARITH
 
 #ifdef SIGNALS
 #include <signal.h>
