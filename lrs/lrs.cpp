@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <new>
 #include <sstream>
+#include <utility>
 
 #include <gmpxx.h>
 
@@ -316,6 +317,12 @@ namespace lrs {
 		}
 		
 		return rval;
+	}
+	
+	std::pair<ind,ind> lrs::blandRatio() {
+		ind enter, leave;
+		::dan_selectpivot(P, Q, &enter, &leave);
+		return std::make_pair(enter, leave);
 	}
 	
 	ind lrs::findBas(ind enter) {

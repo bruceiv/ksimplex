@@ -5,6 +5,7 @@
 #include <new>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 #include "clrs.hpp"
 #include "cobasis.hpp"
@@ -86,6 +87,11 @@ namespace lrs {
 		 *  @return the set of indices that may enter the cobasis
 		 */
 		index_set arrangementRatio(ind leave);
+		
+		/** Finds the indices of the next pivot according to Bland's rule.
+		 *  @return a pair (enter,leave)
+		 */
+		std::pair<ind,ind> blandRatio();
 		
 		/** finds the index in the basis array for a given entering index from 
 		 *  the original list of constraints.

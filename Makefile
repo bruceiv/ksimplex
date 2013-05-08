@@ -26,10 +26,13 @@ OBJS =
 
 .PHONY:  clean lrs
 
-hksimplex:  kmp_tableau.hpp ksimplex.hpp simplex.hpp kilomp/kilomp.cuh
+hksimplex:  ksimplex.cpp kmp_tableau.hpp ksimplex.hpp simplex.hpp kilomp/kilomp.cuh
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o hksimplex ksimplex.cpp $(LDFLAGS)
 
-lrspp:  lrspp.cpp lrs ksimplex.hpp
+lrssimplex: lrssimplex.cpp lrs_io.hpp lrs_tableau.hpp ksimplex.hpp simplex.hpp lrs
+	$(CXX) $(CPPFLAGS) $(LRSCXXFLAGS) -o lrssimplex lrssimplex.cpp $(LRSLDFLAGS)
+
+lrspp:  lrspp.cpp lrs_io.hpp lrs ksimplex.hpp
 	$(CXX) $(CPPFLAGS) $(LRSCXXFLAGS) -o lrspp lrspp.cpp $(LRSLDFLAGS)
 
 lrs:  
