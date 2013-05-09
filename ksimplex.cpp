@@ -102,8 +102,19 @@ void printMatrix(const kilo::mpv m, u32 n, u32 d, std::ostream& out) {
  * 
  * Input (tableau file):
  * <n> <d> <det>
- * <basis_element>{n}
+ * <basis_element>{n+1}
  * (<tableau_element>{d+1}){n+1}
+ *
+ * <n>                the number of constraints
+ * <d>                the dimension of the input
+ * <det>              the initial common denominator for the input matrix
+ * <basis_element>    the basis, the variable indices b_0 b_1 ... b_n represented by the rows; 
+ *                    b_0 should be 0, for the objective function. 
+ *                    The remaining values in the range [0,n+d+1] form the cobasis, the variable 
+ *                    indicies c_0 c_1 ... c_d represented by the rows; c_d is n+d+1, for the 
+ *                    constant term.
+ * <tableau_element>  n+1 rows (the first is the objective), where each row a_0 a_1 ... a_d 
+ *                    represents an inequality a_0 + a_1*c_0 + a_2*c_1 + ... a_d*c_(d-1) >= 0
  */
 int main(int argc, char **argv) {
 	// Read in size and dimension of the the problem
