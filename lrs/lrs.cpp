@@ -34,6 +34,43 @@ namespace lrs {
 		initDic(Q, P, m, lin);
 	}
 	
+	lrs::lrs(matrix_mpq const& m, index_set const& lin, val_t& det, const ind* bas, 
+	         lrs_opts o) : o(o) {
+		/* Initialize LRS */
+		lrs_init_quiet(stdin, stderr);
+		
+		/* Init LRS global data */
+		Q = lrs_alloc_dat((char*)"LRS globals");
+		if (Q == 0) throw std::bad_alloc();
+		
+		/* Init LRS LP dictionary */
+		initDat(Q, m.size(), m.dim());
+		
+		P = lrs_alloc_dic(Q);
+		if (P == 0) throw std::bad_alloc();
+		
+		initDic(Q, P, m, lin);
+		
+		// Copy determinant value in
+		copy(P->det, det);
+		
+		// Generate new row, column, basis & cobasis structures
+		for (ind i = 0; i <= P->m; ++i) P->Row[i] = i;
+		P->Col[P->d] = 0;
+		for (ind i = 0; i < P->d; ++i) P->Col[i] = i+1;
+		
+		ind i_b = 0, i_c = 0;
+		for (ind i = 0; i <= P->m + P->d + 1; ++i) {
+			if ( i_b <= P->m && i == bas[i_b] ) {
+				P->B[i_b] = i;
+				++i_b;
+			} else {
+				P->C[i_c] = i;
+				++i_c;
+			}
+		}
+	}
+	
 	lrs::~lrs() {
 		lrs_free_dic(P, Q);
 		lrs_free_dat(Q);

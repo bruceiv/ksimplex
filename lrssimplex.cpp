@@ -25,17 +25,21 @@ int main(int argc, char** argv) {
 	std::cin >> n;
 	std::cin >> d;
 	
-	// Ignore determinant
-	std::string det;
-	std::cin >> det;
+	// Read determinant
+	lrs::val_t det;
+	lrs_alloc_mp(det);
+	parseHex(std::cin, det);
+	
+	// Read basis values
+	lrs::ind* bas = new lrs::ind[n+1];
+	for (u32 i = 0; i <= n; ++i) std::cin >> bas[i];
 	
 	// Read in matrix, grab objective row first
-	lrs::vector_mpq& obj = *parseVector(std::cin, d);
-	lrs::matrix_mpq& mat = *parseMatrix(std::cin, n, d);
+	lrs::vector_mpq& obj = *parseHexVector(std::cin, d);
+	lrs::matrix_mpq& mat = *parseHexMatrix(std::cin, n, d);
 	
-	// Create LRS instance for pre-processing, and move it to an initial basis
-	lrs::lrs& l = *new lrs::lrs(mat, lrs::index_set(mat.size()+1));
-	l.getFirstBasis();
+	// Create LRS instance initialized to the given determinant and basis
+	lrs::lrs& l = *new lrs::lrs(mat, lrs::index_set(mat.size()+1), det, bas);
 	
 	// Set objective into LRS instance (if you do this before initial basis, LRS solves the 
 	// LP itself, which defeats the point)
@@ -64,6 +68,8 @@ int main(int argc, char** argv) {
 	delete &l;
 	delete &mat;
 	delete &obj;
+	delete[] bas;
+	lrs_clear_mp(det);
 	
 	return 0;
 }

@@ -68,6 +68,18 @@ namespace lrs {
 		 */
 		lrs(matrix_mpq const& m, index_set const& lin, lrs_opts o = lrs_opts());
 		
+		/** Secondary constructor / initializer; allows LRS to be initialized to a specific basis.
+		 *  @param m 			the matrix to load into LRS
+		 *  @param lin			the linearity indices of this matrix
+		 *  @param det			the initial determinant
+		 *  @param bas			the initial basis indices
+		 *  @param o			LRS options (if unsupplied, will use default)
+		 *  @throw bad_alloc	if the LRS process or matrix data structures 
+		 * 						cannot be properly initialized.
+		 */
+		lrs(matrix_mpq const& m, index_set const& lin, val_t& det, const ind* bas, 
+		    lrs_opts o = lrs_opts());
+		
 		/** destructor */
 		~lrs();
 		
