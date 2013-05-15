@@ -101,7 +101,7 @@ namespace lrs {
 		index_set arrangementRatio(ind leave);
 		
 		/** Finds the indices of the next pivot according to Bland's rule.
-		 *  @return a pair (enter,leave)
+		 *  @return a pair (enter,leave); (0, 0) if optimal, (0xFFFFFFFF, 0xFFFFFFFF) if unbounded
 		 */
 		std::pair<ind,ind> blandRatio();
 		
@@ -126,8 +126,10 @@ namespace lrs {
 		 */
 		cobasis* getCobasis(ind col);
 		
-		/** Gets the first basis for DFS-ing from. */
-		bool getFirstBasis();
+		/** Gets the first basis for DFS-ing from.
+		 *  @param solve		Should LRS solve the LP? [true]
+		 */
+		bool getFirstBasis(bool solve = true);
 		
 		/** Gets the true number of inequalities in the polytope represented by 
 		  * the stored dictionary. */

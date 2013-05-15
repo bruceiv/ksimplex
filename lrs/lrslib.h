@@ -29,15 +29,17 @@
 /*  Selection of arithmetic package  */
 /*************************************/
 #ifdef LONG
-#include "lrslong.h"    /* lrs long integer arithmetic package */
+#define ARITH "lrslong.h"    /* lrs long integer arithmetic package */
 #else
 #ifdef GMP
-#include "lrsgmp.h"     /* lrs wrapper for gmp multiple precsion arithmetic    */
+#define ARITH "lrsgmp.h"     /* lrs wrapper for gmp multiple precsion arithmetic    */
 #else
-#include "lrsmp.h"      /* lrs multiple precsion arithmetic    */
+#define ARITH "lrsmp.h"      /* lrs multiple precsion arithmetic    */
 #define MP
 #endif
 #endif
+
+#include ARITH
 
 #ifdef SIGNALS
 #include <signal.h>
@@ -236,8 +238,10 @@ long lrs_read_dic (lrs_dic * P, lrs_dat * Q);	/* read input and set up problem a
 long lrs_checkbound (lrs_dic *P, lrs_dat * Q);  /* TRUE if current objective value exceeds specified bound */
 
 long lrs_getfirstbasis (lrs_dic ** P_p, lrs_dat * Q, lrs_mp_matrix * Lin,long no_output);
+long lrs_getfirstbasis_nosolve (lrs_dic ** P_p, lrs_dat * Q, lrs_mp_matrix * Lin,long no_output);
 	  /* gets first basis, FALSE if none,P may get changed if lin. space Lin found */
           /* no_output is TRUE supresses output headers   */
+
 
 								   /* P may get changed if lin. space Lin found    */
 void lrs_getinput(lrs_dic *P,lrs_dat *Q,long *num,long *den, long m, long d);

@@ -357,9 +357,26 @@ namespace lrs {
 	}
 	
 	std::pair<ind,ind> lrs::blandRatio() {
+		ind* B = P->B;
+		ind* C = P->C;
+		ind* inequality = Q->inequality;
+		ind lastdv = Q->lastdv;
+		ind d = P->d;
+		
 		ind enter, leave;
-		::dan_selectpivot(P, Q, &enter, &leave);
-		return std::make_pair(enter, leave);
+		if ( ::dan_selectpivot(P, Q, &enter, &leave) ) {
+			/* pivot found */
+			return std::make_pair(inequality[ B[enter]-lastdv ], inequality[ C[leave]-lastdv ]);
+		} else {
+			/* tableau optimal or unbounded */
+			if ( leave == d ) {
+				/* tableau optimal */
+				return std::make_pair<ind,ind>(0, 0);
+			} else {
+				/* tableau unbounded */
+				return std::make_pair<ind,ind>(0xFFFFFFFF, 0xFFFFFFFF);
+			}
+		}
 	}
 	
 	ind lrs::findBas(ind enter) {
@@ -433,9 +450,11 @@ namespace lrs {
 		return cob;
 	}
 	
-	bool lrs::getFirstBasis() {
+	bool lrs::getFirstBasis(bool solve) {
 		/* Lin is an out parameter of this method, so it isn't initialized */
-		return lrs_getfirstbasis(&P, Q, &Lin, true);
+		return solve ? 
+			lrs_getfirstbasis(&P, Q, &Lin, true) :
+			lrs_getfirstbasis_nosolve(&P, Q, &Lin, true);
 	}
 	
 	ind lrs::getRealSize() {

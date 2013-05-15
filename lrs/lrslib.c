@@ -1552,6 +1552,313 @@ lrs_getfirstbasis (lrs_dic ** D_p, lrs_dat * Q, lrs_mp_matrix * Lin, long no_out
 }
 /********* end of lrs_getfirstbasis  ***************/
 
+// Variant of lrs_getfirstbasis which does not solve the LP - added by Aaron Moss 15-05-2013
+long lrs_getfirstbasis_nosolve (lrs_dic ** D_p, lrs_dat * Q, lrs_mp_matrix * Lin, long no_output)
+/* gets first basis, FALSE if none              */
+/* P may get changed if lin. space Lin found    */
+/* no_output is TRUE supresses output headers   */
+{
+  lrs_mp scale, Temp;
+
+  long i, j, k;
+
+/* assign local variables to structures */
+
+  lrs_mp_matrix A;
+  long *B, *C, *Row, *Col;
+  long *inequality;
+  long *linearity;
+  long hull = Q->hull;
+  long m, d, lastdv, nlinearity, nredundcol;
+
+  static long ocount=0;
+
+  lrs_alloc_mp(Temp); lrs_alloc_mp(scale);
+
+  if (Q->lponly)
+    no_output = TRUE;
+  m = D->m;
+  d = D->d;
+  lastdv = Q->lastdv;
+
+  nredundcol = 0L;		/* will be set after getabasis        */
+  nlinearity = Q->nlinearity;	/* may be reset if new linearity read or in getabasis*/
+  linearity = Q->linearity;
+
+  A = D->A;
+  B = D->B;
+  C = D->C;
+  Row = D->Row;
+  Col = D->Col;
+  inequality = Q->inequality;
+
+
+  if (Q->nlinearity > 0 && Q->nonnegative)
+   {
+    fprintf (lrs_ofp, "\n*linearity and nonnegative options incompatible");
+    fprintf (lrs_ofp, " - all linearities are skipped");
+    fprintf (lrs_ofp, "\n*add nonnegative constraints explicitly and ");
+    fprintf (lrs_ofp, " remove nonnegative option");
+   }
+
+  if (Q->nlinearity && Q->voronoi)
+    fprintf (lrs_ofp, "\n*linearity and Voronoi options set - results unpredictable");
+  if (Q->lponly && !Q->maximize && !Q->minimize)
+    fprintf (lrs_ofp, "\n*LP has no objective function given - assuming all zero");
+
+
+  if (Q->runs > 0)		/* arrays for estimator */
+    {
+      Q->isave = (long *) CALLOC ((unsigned) (m * d), sizeof (long));
+      Q->jsave = (long *) CALLOC ((unsigned) (m * d), sizeof (long));
+    }
+/* default is to look for starting cobasis using linearies first, then     */
+/* filling in from last rows of input as necessary                         */
+/* linearity array is assumed sorted here                                  */
+/* note if restart/given start inequality indices already in place         */
+/* from nlinearity..d-1                                                    */
+  for (i = 0; i < nlinearity; i++)	/* put linearities first in the order */
+    inequality[i] = linearity[i];
+
+  k = 0;			/* index for linearity array   */
+
+  if (Q->givenstart)
+    k = d;
+  else
+    k = nlinearity;
+  for (i = m; i >= 1; i--)
+    {
+      j = 0;
+      while (j < k && inequality[j] != i)
+	j++;			/* see if i is in inequality  */
+      if (j == k)
+	inequality[k++] = i;
+    }
+  if (Q->debug)
+    {
+      fprintf (lrs_ofp, "\n*Starting cobasis uses input row order");
+      for (i = 0; i < m; i++)
+	fprintf (lrs_ofp, " %ld", inequality[i]);
+    }
+/* for voronoi convert to h-description using the transform                  */
+/* a_0 .. a_d-1 -> (a_0^2 + ... a_d-1 ^2)-2a_0x_0-...-2a_d-1x_d-1 + x_d >= 0 */
+/* note constant term is stored in column d, and column d-1 is all ones      */
+/* the other coefficients are multiplied by -2 and shifted one to the right  */
+  if (Q->debug)
+    printA (D, Q);
+  if (Q->voronoi)
+    {
+      Q->hull = FALSE;
+      hull = FALSE;
+      for (i = 1; i <= m; i++)
+	{
+	  if (zero (A[i][1]))
+	    {
+	      fprintf (lrs_ofp, "\nWith voronoi option column one must be all one");
+	      return (FALSE);
+	    }
+	  copy (scale, A[i][1]);	/*adjust for scaling to integers of rationals */
+	  itomp (ZERO, A[i][0]);
+	  for (j = 2; j <= d; j++)	/* transform each input row */
+	    {
+	      copy (Temp, A[i][j]);
+	      mulint (A[i][j], Temp, Temp);
+	      linint (A[i][0], ONE, Temp, ONE);
+	      linint (A[i][j - 1], ZERO, A[i][j], -TWO);
+	      mulint (scale, A[i][j - 1], A[i][j - 1]);
+	    }			/* end of for (j=1;..) */
+	  copy (A[i][d], scale);
+	  mulint (scale, A[i][d], A[i][d]);
+	}			/* end of for (i=1;..) */
+      if (Q->debug)
+	printA (D, Q);
+    }				/* end of if(voronoi)     */
+  if (!Q->maximize && !Q->minimize)
+    for (j = 0; j <= d; j++)
+      itomp (ZERO, A[0][j]);
+
+/* Now we pivot to standard form, and then find a primal feasible basis       */
+/* Note these steps MUST be done, even if restarting, in order to get         */
+/* the same index/inequality correspondance we had for the original prob.     */
+/* The inequality array is used to give the insertion order                   */
+/* and is defaulted to the last d rows when givenstart=FALSE                  */
+
+  if(Q->nonnegative) 
+   {
+/* no need for initial pivots here, labelling already done */
+     Q->lastdv = d;
+     Q->nredundcol = 0;
+   }
+  else
+  {
+     if (!getabasis (D, Q, inequality))
+          return FALSE;
+/* bug fix 2009.12.2 */
+     nlinearity=Q->nlinearity;   /*may have been reset if some lins are redundant*/
+  }
+  if(Q->debug)
+  {
+    fprintf(lrs_ofp,"\nafter getabasis");
+    printA(D, Q);
+  }
+  nredundcol = Q->nredundcol;
+  lastdv = Q->lastdv;
+  d = D->d;
+
+/********************************************************************/
+/* now we start printing the output file  unless no output requested */
+/********************************************************************/
+  if (!no_output || Q->debug)
+    {
+      if (Q->voronoi)
+	fprintf (lrs_ofp, "\n*Voronoi Diagram: Voronoi vertices and rays are output");
+      if (hull)
+	fprintf (lrs_ofp, "\nH-representation");
+      else
+	fprintf (lrs_ofp, "\nV-representation");
+
+/* Print linearity space                 */
+/* Don't print linearity if first column zero in hull computation */
+
+      if (hull && Q->homogeneous)
+	k = 1;			/* 0 normally, 1 for homogeneous case     */
+      else
+	k = 0;
+
+      if (nredundcol > k)
+	{
+	  fprintf (lrs_ofp, "\nlinearity %ld ", nredundcol - k);	/*adjust nredundcol for homog. */
+	  for (i = 1; i <= nredundcol - k; i++)
+	    fprintf (lrs_ofp, " %ld", i);
+	}			/* end print of linearity space */
+
+      fprintf (lrs_ofp, "\nbegin");
+      fprintf (lrs_ofp, "\n***** %ld rational", Q->n);
+
+    }				/* end of if !no_output .......   */
+
+
+/* Reset up the inequality array to remember which index is which input inequality */
+/* inequality[B[i]-lastdv] is row number of the inequality with index B[i]              */
+/* inequality[C[i]-lastdv] is row number of the inequality with index C[i]              */
+
+  for (i = 1; i <= m; i++)
+    inequality[i] = i;
+  if (nlinearity > 0)		/* some cobasic indices will be removed */
+    {
+      for (i = 0; i < nlinearity; i++)	/* remove input linearity indices */
+	inequality[linearity[i]] = 0;
+      k = 1;			/* counter for linearities         */
+      for (i = 1; i <= m - nlinearity; i++)
+	{
+	  while (k <= m && inequality[k] == 0)
+	    k++;		/* skip zeroes in corr. to linearity */
+	  inequality[i] = inequality[k++];
+	}
+    }				/* end if linearity */
+  if (Q->debug)
+    {
+      fprintf (lrs_ofp, "\ninequality array initialization:");
+      for (i = 1; i <= m - nlinearity; i++)
+	fprintf (lrs_ofp, " %ld", inequality[i]);
+    }
+  if (nredundcol > 0)
+    {
+      *Lin = lrs_alloc_mp_matrix (nredundcol, Q->n);
+
+      for (i = 0; i < nredundcol; i++)
+	{
+	  if (!(Q->homogeneous && Q->hull && i == 0))	/* skip redund col 1 for homog. hull */
+	    {
+	      lrs_getray (D, Q, Col[0], D->C[0] + i - hull, (*Lin)[i]);		/* adjust index for deletions */
+	    }
+
+	  if (!removecobasicindex (D, Q, 0L))
+	    return FALSE;
+	}
+    }				/* end if nredundcol > 0 */
+
+  if (Q->lponly || Q->nash )
+      if (Q->verbose)
+      {
+      fprintf (lrs_ofp, "\nNumber of pivots for starting dictionary: %ld",Q->count[3]);
+      ocount=Q->count[3];
+      if(Q->lponly)
+                     printA (D, Q);
+       }
+
+/* Do dual pivots to get primal feasibility */
+  if (!primalfeasible (D, Q))
+    {
+#ifndef LRS_QUIET
+          fprintf (lrs_ofp, "\nNo feasible solution");
+#endif
+     if (Q->nash && Q->verbose )
+      {
+          fprintf (lrs_ofp, "\nNumber of pivots for feasible solution: %ld",Q->count[3]);
+          fprintf (lrs_ofp, " - No feasible solution");
+          ocount=Q->count[3];
+      }
+      return FALSE;
+    }
+
+  if (Q->lponly || Q->nash )
+      if (Q->verbose)
+     {
+      fprintf (lrs_ofp, "\nNumber of pivots for feasible solution: %ld",Q->count[3]);
+      ocount=Q->count[3];
+      if(Q->lponly)
+	      printA (D, Q);
+     }
+
+
+/* Now solve LP if objective function was given */
+/* Trimmed for purposes of LP-solving */
+
+/* reindex basis to 0..m if necessary */
+/* we use the fact that cobases are sorted by index value */
+  if (Q->debug)
+    printA (D, Q);
+  while (C[0] <= m)
+    {
+      i = C[0];
+      j = inequality[B[i] - lastdv];
+      inequality[B[i] - lastdv] = inequality[C[0] - lastdv];
+      inequality[C[0] - lastdv] = j;
+      C[0] = B[i];
+      B[i] = i;
+      reorder1 (C, Col, ZERO, d);
+    }
+
+  if (Q->debug)
+    {
+      fprintf (lrs_ofp, "\n*Inequality numbers for indices %ld .. %ld : ", lastdv + 1, m + d);
+      for (i = 1; i <= m - nlinearity; i++)
+	fprintf (lrs_ofp, " %ld ", inequality[i]);
+      printA (D, Q);
+    }
+
+
+
+  if (Q->restart)
+    {
+      if (Q->debug)
+	fprintf (lrs_ofp, "\nPivoting to restart co-basis");
+      if (!restartpivots (D, Q))
+	return FALSE;
+      D->lexflag = lexmin (D, Q, ZERO);		/* see if lexmin basis */
+      if (Q->debug)
+	printA (D, Q);
+    }
+/* Check to see if necessary to resize */
+  if (Q->inputd > D->d)
+    *D_p = resize (D, Q);
+
+  lrs_clear_mp(Temp); lrs_clear_mp(scale);
+  return TRUE;
+}
+/********* end of lrs_getfirstbasis_nosolve  ***************/
+
 
 /*****************************************/
 /* getnextbasis in reverse search order  */

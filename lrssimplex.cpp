@@ -41,9 +41,9 @@ int main(int argc, char** argv) {
 	// Create LRS instance initialized to the given determinant and basis
 	lrs::lrs& l = *new lrs::lrs(mat, lrs::index_set(mat.size()+1), det, bas);
 	
-	// Set objective into LRS instance (if you do this before initial basis, LRS solves the 
-	// LP itself, which defeats the point)
+	// Set objective into LRS instance and get first basis (not solving the LP)
 	l.setLPObj(obj);
+	l.getFirstBasis(false);
 	
 	// Construct tableau
 	lrs_tableau tab(l, n, d);
