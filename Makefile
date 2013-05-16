@@ -16,6 +16,7 @@ CUDADEBUGFLAGS = -g -G -DDEBUG_CUDA -arch=compute_20 -code=sm_21 \
 LDFLAGS = 
 #LRS linker flags
 LRSLDFLAGS = $(LDFLAGS) -Llrs -llrs -lgmpxx -lgmp
+GMPLDFLAGS = $(LDFLAGS) -lgmp
 
 # object files to include in this executable
 OBJS = 
@@ -31,6 +32,9 @@ hksimplex:  ksimplex.cpp kmp_tableau.hpp ksimplex.hpp simplex.hpp kilomp/kilomp.
 
 lrssimplex: lrssimplex.cpp lrs_io.hpp lrs_tableau.hpp ksimplex.hpp simplex.hpp lrs
 	$(CXX) $(CPPFLAGS) $(LRSCXXFLAGS) -o lrssimplex lrssimplex.cpp $(LRSLDFLAGS)
+
+gmpsimplex: gmpsimplex.cpp gmp_tableau.hpp ksimplex.hpp simplex.hpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o gmpsimplex gmpsimplex.cpp $(GMPLDFLAGS)
 
 lrspp:  lrspp.cpp lrs_io.hpp lrs ksimplex.hpp
 	$(CXX) $(CPPFLAGS) $(LRSCXXFLAGS) -o lrspp lrspp.cpp $(LRSLDFLAGS)
