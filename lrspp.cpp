@@ -45,13 +45,11 @@ int main(int argc, char** argv) {
 	lrs::vector_mpq& obj = *parseVector(std::cin, d);
 	lrs::matrix_mpq& mat = *parseMatrix(std::cin, n, d);
 	
-	// Create LRS instance for pre-processing, and move it to an initial basis
+	// Create LRS instance for pre-processing, set the objective, and move it to an initial basis 
+	// without solving the LP
 	lrs::lrs& l = *new lrs::lrs(mat, lrs::index_set(mat.size()+1));
-	l.getFirstBasis();
-	
-	// Set objective into LRS instance (if you do this before initial basis, LRS solves the 
-	// LP itself, which defeats the point)
 	l.setLPObj(obj);
+	l.getFirstBasis(false);
 	
 	// Write size and dimension of problem, as well as determinant
 	std::cout << n << " " << d << " " << hex(l.getDeterminant()) << std::endl;

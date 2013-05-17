@@ -365,9 +365,15 @@ namespace lrs {
 		
 		ind enter, leave;
 		if ( ::dan_selectpivot(P, Q, &enter, &leave) ) {
+std::cout << "\t::dan_selectpivot() -> (true," << enter << "," << leave << ")" << std::endl;
+std::cout << "\tinequality: ["; for (ind i = 0; i <= P->m; ++i) std::cout << " " << inequality[i]; std::cout << " ]" << std::endl;
+std::cout << "\tB: ["; for (ind i = 0; i <= P->m; ++i) std::cout << " " << B[i]; std::cout << " ]" << std::endl;
+std::cout << "\tC: ["; for (ind i = 0; i <= d; ++i) std::cout << " " << C[i]; std::cout << " ]" << std::endl;
+std::cout << "\tlastdv: " << lastdv << std::endl;
 			/* pivot found */
 			return std::make_pair(inequality[ B[enter]-lastdv ], inequality[ C[leave]-lastdv ]);
 		} else {
+std::cout << "\t::dan_selectpivot() -> (false," << enter << "," << leave << ")" << std::endl;
 			/* tableau optimal or unbounded */
 			if ( leave == d ) {
 				/* tableau optimal */

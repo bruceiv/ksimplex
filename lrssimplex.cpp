@@ -38,12 +38,9 @@ int main(int argc, char** argv) {
 	lrs::vector_mpq& obj = *parseHexVector(std::cin, d);
 	lrs::matrix_mpq& mat = *parseHexMatrix(std::cin, n, d);
 	
-	// Create LRS instance initialized to the given determinant and basis
+	// Create LRS instance initialized to the given determinant and basis, and set objective
 	lrs::lrs& l = *new lrs::lrs(mat, lrs::index_set(mat.size()+1), det, bas);
-	
-	// Set objective into LRS instance and get first basis (not solving the LP)
 	l.setLPObj(obj);
-	l.getFirstBasis(false);
 	
 	// Construct tableau
 	lrs_tableau tab(l, n, d);

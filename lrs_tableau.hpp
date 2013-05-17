@@ -26,6 +26,7 @@ public:
 	
 	pivot ratioTest() {
 		std::pair<u64,u64> p = l.blandRatio();
+std::cout << "\tlrs::blandRatio() -> (" << p.first << "," << p.second << ")" << std::endl;
 		pivot q(p.first, p.second);
 		return q;
 	}
