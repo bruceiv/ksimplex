@@ -69,6 +69,9 @@ namespace lrs {
 				++i_c;
 			}
 		}
+		
+		// Initialize the inequality array
+		for (ind i = 1; i <= P->m; ++i) Q->inequality[i] = i;
 	}
 	
 	lrs::~lrs() {
@@ -365,15 +368,9 @@ namespace lrs {
 		
 		ind enter, leave;
 		if ( ::dan_selectpivot(P, Q, &enter, &leave) ) {
-std::cout << "\t::dan_selectpivot() -> (true," << enter << "," << leave << ")" << std::endl;
-std::cout << "\tinequality: ["; for (ind i = 0; i <= P->m; ++i) std::cout << " " << inequality[i]; std::cout << " ]" << std::endl;
-std::cout << "\tB: ["; for (ind i = 0; i <= P->m; ++i) std::cout << " " << B[i]; std::cout << " ]" << std::endl;
-std::cout << "\tC: ["; for (ind i = 0; i <= d; ++i) std::cout << " " << C[i]; std::cout << " ]" << std::endl;
-std::cout << "\tlastdv: " << lastdv << std::endl;
 			/* pivot found */
 			return std::make_pair(inequality[ B[enter]-lastdv ], inequality[ C[leave]-lastdv ]);
 		} else {
-std::cout << "\t::dan_selectpivot() -> (false," << enter << "," << leave << ")" << std::endl;
 			/* tableau optimal or unbounded */
 			if ( leave == d ) {
 				/* tableau optimal */
@@ -605,7 +602,9 @@ std::cout << "\t::dan_selectpivot() -> (false," << enter << "," << leave << ")" 
 		
 		out << "\n Co-Basis "; for (i = 0; i <= d; i++) out << C[i] << " ";
 		out << " Column "; for (i = 0; i <= d; i++) out << Col[i] << " ";
-		out << " det=" << toString(P->det) << "\n";
+		out << " det=" << toString(P->det);
+		out << "\n Ineq     "; for (i = 0; i <=m; ++i) out << Q->inequality[i] << " ";
+		out << "\n";
 		
 		for (i = 0; i <= m; i++) {
 			out << "A[" << B[i] << "]";
