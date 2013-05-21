@@ -61,7 +61,7 @@ public:	 //public interface
 	 * 					and the 0-column is for the constant terms)
 	 */
 	kmp_tableau(u32 n, u32 d, u32 a_l, u32 u_l, const u32* cob, const u32* bas, kilo::mpv mat)
-			: n(n), d(d), a_l(a_l), u_l(u_l), m_l(1 + 2*(n+1)*(d+1)) {
+			: n(n), d(d), a_l(a_l), u_l(u_l), m_l(3 + (n+1)*(d+1)) {
 		
 		// Allocate basis, cobasis, row, column, and matrix storage
 		b = new u32[n+1];

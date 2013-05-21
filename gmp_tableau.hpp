@@ -47,7 +47,7 @@ public:	 //public interface
 	 * 					and the 0-column is for the constant terms)
 	 */
 	gmp_tableau(u32 n, u32 d, const u32* cob, const u32* bas, mpz_t* mat)
-			: n(n), d(d), m_l(3 + 2*(n+1)*(d+1)) {
+			: n(n), d(d), m_l(3 + (n+1)*(d+1)) {
 		
 		// Allocate basis, cobasis, row, column, and matrix storage
 		b = new u32[n+1];
