@@ -42,7 +42,7 @@ void parse(mpz_t* m, u32 i, std::istream& in) {
  * @param in		The stream to read from
  */
 void parseMatrix(mpz_t* m, u32 n, u32 d, std::istream& in) {
-	u32 m_l = 1 + (n+1)+(d+1);
+	u32 m_l = 1 + (n+1)*(d+1);
 	for (u32 i = 1; i < m_l; ++i) { parse(m, i, std::cin); }
 }
 

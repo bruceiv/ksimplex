@@ -179,7 +179,7 @@ public:	 //public interface
 		u32 t1 = tmp(1);
 		u32 t2 = tmp(2);
 		
-		for (iL = 1; iL <= n; ++iL) {
+		for (iL = d+1; iL <= n; ++iL) {  // Ignore decision variables (first d)
 			if ( mpz_sgn(m[elm(iL, jE)]) < 0 ) {  // Negative value in entering column
 				if ( leave == 0 ) {  // First possible leaving variable
 					iMin = iL;

@@ -199,7 +199,7 @@ public:	 //public interface
 		
 		ensure_limbs(u_l*2);  // Make sure enough space in temp variables
 		
-		for (iL = 1; iL <= n; ++iL) {
+		for (iL = d+1; iL <= n; ++iL) {  // Ignore decision variables (first d)
 			if ( kilo::is_neg(m, elm(iL, jE)) ) {  // Negative value in entering column
 				if ( leave == 0 ) {  // First possible leaving variable
 					iMin = iL;
