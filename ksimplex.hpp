@@ -4,6 +4,8 @@
 
 /** 
  * Shared definitions for the KSimplex project
+ * 
+ * @author Aaron Moss
  */
 
 namespace ksimplex {
