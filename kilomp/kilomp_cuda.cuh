@@ -151,7 +151,7 @@ __host__ mpv expand_d(mpv v_d, u32 n, u32 old_l, u32 alloc_l) {
 	cudaMemcpy(w_d+old_l+1, w_h, (alloc_l-old_l)*sizeof(limb*), cudaMemcpyHostToDevice); CHECK_CUDA_SAFE
 	
 	//replace v with w
-	cudaFree(v_d);
+	cudaFree(v_d); CHECK_CUDA_SAFE
 	return w_d;
 }
 
@@ -166,8 +166,8 @@ __host__ void clear_d(mpv v_d, u32 alloc_l) {
 	cudaMemcpy(v_h, v_d, (1+alloc_l)*sizeof(limb*), cudaMemcpyDeviceToHost); CHECK_CUDA_SAFE
 	
 	// Free device arrays
-	for (u32 i = 0; i <= alloc_l; ++i) { cudaFree(v_h[i]); }
-	cudaFree(v_d);
+	for (u32 i = 0; i <= alloc_l; ++i) { cudaFree(v_h[i]); CHECK_CUDA_SAFE }
+	cudaFree(v_d); CHECK_CUDA_SAFE
 }
 
 } /* namespace kilo */

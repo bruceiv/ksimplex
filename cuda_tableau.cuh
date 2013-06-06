@@ -16,34 +16,29 @@ namespace ksimplex {
 class cuda_tableau {
 private:  //internal convenience functions
 	
-	/** @return index of the determinant */
-//	static const u32 det = 0;
-	
-	/** @return index of j'th objective function coefficient (j >= 1) */
-//	inline u32 obj(u32 j) const { return j+1; }
-	
-	/** @return index of constant coefficient of i'th row (i >= 1) */
-//	inline u32 con(u32 i) const { return i*(d+1)+1; }
-	
-	/** @return index of j'th coefficient of i'th row (i, j >= 1) */
-//	inline u32 elm(u32 i, u32 j) const { return i*(d+1)+j+1; }
-	
-	/** @return index of x'th temp variable (x >= 1) */
-//	inline u32 tmp(u32 x) const { return (n+1)*(d+1)+x; }
-	
-	/** Ensures at least a_n limbs are allocated in the matrix */
-/*	void ensure_limbs(u32 a_n) {
-		if ( a_n > a_l ) {
-			m = kilo::expand(m, m_l, a_l, a_n);
-			a_l = a_n;
+	/** Ensures at least a_n limbs are allocated in the device matrix */
+	void ensure_limbs_d(u32 a_n) {
+		if ( a_n > a_dl ) {
+			m = kilo::expand_d(m, m_dl, a_dl, a_n);
+			a_dl = a_n;
 		}
 	}
-*/	
-	/** Ensures used limb counter is at least as high as u_n */
-/*	void count_limbs(u32 u_n) {
-		if ( u_n > u_l ) { u_l = u_n; }
+	
+	/** Ensures that there is enough space in the matrix to hold temporaries of all current 
+	 *  calculations. */
+	void ensure_temp_space_d() {
+		cudaMemcpy(&u_l, u_d, sizeof(u32), cudaMemcpyDeviceToHost); CHECK_CUDA_SAFE
+		ensure_limbs_d(2*u_l);
 	}
-*/	
+	
+	/** Ensures at least a_n limbs are allocated in the host matrix */
+	void ensure_limbs(u32 a_n) {
+		if ( a_n > a_hl ) {
+			m = kilo::expand(m, m_hl, a_hl, a_n);
+			a_hl = a_n;
+		}
+	}
+	
 public:	 //public interface
 	/**
 	 * Default constructor.
@@ -62,19 +57,21 @@ public:	 //public interface
 	 * 					and the 0-column is for the constant terms)
 	 */
 	cuda_tableau(u32 n, u32 d, u32 a_l, u32 u_l, const u32* cob, const u32* bas, kilo::mpv mat)
-			: n(n), d(d), a_l(a_l), u_l(u_l), m_dl(1 + 2*(n+1)*(d+1)), m_hl(1+ (n+1)*(d+1)) {
+			: n(n), d(d), a_hl(a_l), a_dl(a_l), u_l(u_l), 
+			m_dl(1 + 2*(n+1)*(d+1)), m_hl(1+ (n+1)*(d+1)) {
 		
 		// Allocate basis, cobasis, row, column, and matrix storage on host
 		b = new u32[n+1];
 		c = new u32[d+1];
 		row = new u32[n+d+1];
 		col = new u32[n+d+1];
-		m = kilo::init_mpv(m_hl, a_l);
+		m = kilo::init_mpv(m_hl, a_hl);
 		
-		// Allocate basis, cobasis, and matrix storage on device
+		// Allocate limb count, basis, cobasis, and matrix storage on device
+		u_d = cudaMalloc((void**)&u_d, sizeof(u32)); CHECK_CUDA_SAFE
 		b_d = cudaMalloc((void**)&b_d, (n+1)*sizeof(u32)); CHECK_CUDA_SAFE
 		c_d = cudaMalloc((void**)&c_d, (d+1)*sizeof(u32)); CHECK_CUDA_SAFE
-		m_d = kilo::init_mpv_d(m_dl, a_l);
+		m_d = kilo::init_mpv_d(m_dl, a_dl);
 		
 		u32 i, j, r_i, c_j;
 		
@@ -98,7 +95,8 @@ public:	 //public interface
 		}
 		while ( c_j <= n+d ) col[c_j++] = 0;
 		
-		// Copy basis, cobasis, and matrix to device
+		// Copy limb count, basis, cobasis, and matrix to device
+		cudaMemcpy(u_d, &u_l, sizeof(u32), cudaMemcpyHostToDevice); CHECK_CUDA_SAFE
 		cudaMemcpy(b_d, b, (n+1)*sizeof(u32), cudaMemcpyHostToDevice); CHECK_CUDA_SAFE
 		cudaMemcpy(c_d, c, (d+1)*sizeof(u32), cudaMemcpyHostToDevice); CHECK_CUDA_SAFE
 		kilo::copy_hd(m_d, mat, m_hl, u_l);
@@ -109,30 +107,46 @@ public:	 //public interface
 	 * 
 	 * @param o			The tableau to copy
 	 */
-	cuda_tableau(const cuda_tableau& o) : n(o.n), d(o.d), a_l(o.a_l), u_l(o.u_l), m_l(o.m_l) {	
-		// Allocate basis, cobasis, row, column, and matrix storage
+	cuda_tableau(const cuda_tableau& o)
+			: n(o.n), d(o.d), a_hl(o.a_dl), a_dl(o.a_dl), u_l(o.u_l), m_dl(o.m_dl), m_hl(o.m_hl) {	
+		// Allocate basis, cobasis, row, column, and matrix storage on host
 		b = new u32[n+1];
 		c = new u32[d+1];
 		row = new u32[n+d+1];
 		col = new u32[n+d+1];
-		m = kilo::init_mpv(m_l, a_l);
+		m = kilo::init_mpv(m_hl, a_hl);
 		
-		// Copy basis, cobasis, row, column, and matrix
-		u32 i;
-		for (i = 0; i <= n; ++i) { b[i] = o.b[i]; }
-		for (i = 0; i <= d; ++i) { c[i] = o.c[i]; }
-		for (i = 0; i <= n+d; ++i) { row[i] = o.row[i]; }
-		for (i = 0; i <= n+d; ++i) { col[i] = o.col[i]; }
-		kilo::copy(m, o.m, 1 + (n+1)*(d+1), u_l);
+		// Allocate limb count, basis, cobasis, and matrix storage on device
+		u_d = cudaMalloc((void**)&u_d, sizeof(u32)); CHECK_CUDA_SAFE
+		b_d = cudaMalloc((void**)&b_d, (n+1)*sizeof(u32)); CHECK_CUDA_SAFE
+		c_d = cudaMalloc((void**)&c_d, (d+1)*sizeof(u32)); CHECK_CUDA_SAFE
+		m_d = kilo::init_mpv_d(m_dl, a_dl);
+		
+		// Copy row and column on host
+		for (u32 i = 0; i <= n+d; ++i) { row[i] = o.row[i]; }
+		for (u32 i = 0; i <= n+d; ++i) { col[i] = o.col[i]; }
+		
+		// Copy limb count, basis, cobasis, and matrix on device
+		cudaMemcpy(u_d, o.u_d, sizeof(u32), cudaMemcpyDeviceToDevice); CHECK_CUDA_SAFE
+		cudaMemcpy(b_d, o.b_d, (n+1)*sizeof(u32), cudaMemcpyDeviceToDevice); CHECK_CUDA_SAFE
+		cudaMemcpy(c_d, o.c_d, (d+1)*sizeof(u32), cudaMemcpyDeviceToDevice); CHECK_CUDA_SAFE
+		kilo::copy_dd(m_d, o.m_d, m_hl, u_l);
 	}
 	
 	/** Destructor */
 	~cuda_tableau() {
+		// Clear host-side storage
 		delete[] b;
 		delete[] c;
 		delete[] row;
 		delete[] col;
-		kilo::clear(m, a_l);
+		kilo::clear(m, a_hl);
+		
+		// Clear device-side storage
+		cudaFree(u_d); CHECK_CUDA_SAFE
+		cudaFree(b_d); CHECK_CUDA_SAFE
+		cudaFree(c_d); CHECK_CUDA_SAFE
+		kilo::clear_d(m_d, a_dl);
 	}
 	
 	/**
@@ -143,33 +157,48 @@ public:	 //public interface
 	cuda_tableau& operator = (const cuda_tableau& o) {
 		// Ensure matrix storage properly sized
 		if ( n == o.n && d == o.d ) {
-			// Matrix sizes are compatible, just ensure enough limbs
+			// Matrix sizes are compatible, just ensure enough limbs on device
 			u_l = o.u_l;
-			ensure_limbs(o.a_l);
+			ensure_limbs_d(o.a_dl);
 		} else {
 			// Matrix sizes are not the same, rebuild
+			// Clear host-side storage
 			delete[] b;
 			delete[] c;
 			delete[] row;
 			delete[] col;
-			kilo::clear(m, a_l);
+			kilo::clear(m, a_hl);
+		
+			// Clear device-side storage
+			cudaFree(b_d); CHECK_CUDA_SAFE
+			cudaFree(c_d); CHECK_CUDA_SAFE
+			kilo::clear_d(m_d, a_dl);
 			
-			n = o.n; d = o.d; a_l = o.a_l; u_l = o.u_l; m_l = o.m_l;
+			n = o.n; d = o.d; a_hl = o.a_dl; a_dl = o.a_dl; u_l = o.u_l; 
+			m_hl = o.m_hl; m_dl = o.m_dl;
 			
+			// Allocate basis, cobasis, row, column, and matrix storage on host
 			b = new u32[n+1];
 			c = new u32[d+1];
 			row = new u32[n+d+1];
 			col = new u32[n+d+1];
-			m = kilo::init_mpv(m_l, a_l);
+			m = kilo::init_mpv(m_hl, a_hl);
+		
+			// Allocate basis, cobasis, and matrix storage on device
+			b_d = cudaMalloc((void**)&b_d, (n+1)*sizeof(u32)); CHECK_CUDA_SAFE
+			c_d = cudaMalloc((void**)&c_d, (d+1)*sizeof(u32)); CHECK_CUDA_SAFE
+			m_d = kilo::init_mpv_d(m_dl, a_dl);
 		}
 		
-		// Copy basis, cobasis, row, column, and matrix
-		u32 i;
-		for (i = 0; i <= n; ++i) { b[i] = o.b[i]; }
-		for (i = 0; i <= d; ++i) { c[i] = o.c[i]; }
-		for (i = 0; i <= n+d; ++i) { row[i] = o.row[i]; }
-		for (i = 0; i <= n+d; ++i) { col[i] = o.col[i]; }
-		kilo::copy(m, o.m, 1 + (n+1)*(d+1), u_l);
+		// Copy row and column on host
+		for (u32 i = 0; i <= n+d; ++i) { row[i] = o.row[i]; }
+		for (u32 i = 0; i <= n+d; ++i) { col[i] = o.col[i]; }
+		
+		// Copy limb count, basis, cobasis, and matrix on device
+		cudaMemcpy(u_d, o.u_d, sizeof(u32), cudaMemcpyDeviceToDevice); CHECK_CUDA_SAFE
+		cudaMemcpy(b_d, o.b_d, (n+1)*sizeof(u32), cudaMemcpyDeviceToDevice); CHECK_CUDA_SAFE
+		cudaMemcpy(c_d, o.c_d, (d+1)*sizeof(u32), cudaMemcpyDeviceToDevice); CHECK_CUDA_SAFE
+		kilo::copy_dd(m_d, o.m_d, m_hl, u_l);
 		
 		return *this;
 	}
@@ -318,8 +347,10 @@ private:  //class members
 	u32* row;             ///< row indices for variables
 	u32* col;             ///< column indices for variables
 	
-	u32 a_l;              ///< number of limbs allocated for matrix
+	u32 a_hl;             ///< number of limbs allocated for host matrix
+	u32 a_dl;             ///< number of limbs allocated for device matrix
 	u32 u_l;              ///< maximum number of limbs used for matrix
+	u32* u_d;             ///< device storage for number of used limbs
 	u32 m_dl;             ///< number of elements in the device matrix (includes temps)
 	u32 m_hl;             ///< number of elements in the host matrix (excludes temps)
 	
