@@ -36,6 +36,12 @@ lrssimplex: lrssimplex.cpp lrs_io.hpp lrs_tableau.hpp ksimplex.hpp simplex.hpp l
 gmpsimplex: gmpsimplex.cpp gmp_tableau.hpp ksimplex.hpp simplex.hpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o gmpsimplex gmpsimplex.cpp $(GMPLDFLAGS)
 
+dksimplex:  cudasimplex.cu cuda_tableau.cuh ksimplex.hpp simplex.hpp kilomp/kilomp.cuh kilomp/kilomp_cuda.cuh
+	nvcc $(CUDAFLAGS) -o dkimplex cudasimplex.cu $(LDFLAGS)
+
+dksimplex_debug:  cudasimplex.cu cuda_tableau.cuh ksimplex.hpp simplex.hpp kilomp/kilomp.cuh kilomp/kilomp_cuda.cuh
+	nvcc $(CUDADEBUGFLAGS) -o dkimplex cudasimplex.cu $(LDFLAGS)
+
 lrspp:  lrspp.cpp lrs_io.hpp lrs ksimplex.hpp
 	$(CXX) $(CPPFLAGS) $(LRSCXXFLAGS) -o lrspp lrspp.cpp $(LRSLDFLAGS)
 
