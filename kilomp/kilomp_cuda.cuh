@@ -42,10 +42,10 @@ namespace kilo {
  */
 __host__ mpv init_mpv_d(u32 n, u32 alloc_l = 4) {
 	//allocate limb array pointers
-	limb*[1+alloc_l] v_h;
+	limb* v_h[1+alloc_l];
 	
 	//zero element values
-	limb[n] l;
+	limb l[n];
 	for (u32 j = 0; j < n; ++j) { l[j] = 0; }
 	cudaMalloc((void**)&v_h[0], n*limb_size); CHECK_CUDA_SAFE
 	cudaMemcpy(v_h[0], l, n*limb_size, cudaMemcpyHostToDevice); CHECK_CUDA_SAFE
@@ -74,7 +74,7 @@ __host__ mpv init_mpv_d(u32 n, u32 alloc_l = 4) {
  */
 __host__ void copy_hd(mpv d_d, mpv s, u32 n, u32 a_l) {
 	// Copy the device pointers for the limb arrays down
-	limb*[1+a_l] d_h;
+	limb* d_h[1+a_l];
 	cudaMemcpy(d_h, d_d, (1+a_l)*sizeof(limb*), cudaMemcpyDeviceToHost); CHECK_CUDA_SAFE
 	
 	// Copy limb arrays up to device
@@ -94,8 +94,8 @@ __host__ void copy_hd(mpv d_d, mpv s, u32 n, u32 a_l) {
  */
 __host__ void copy_dd(mpv d_d, mpv s_d, u32 n, u32 a_l) {
 	// Copy the device pointers for the limb arrays down
-	limb*[1+a_l] d_h;
-	limb*[1+a_l] s_h;
+	limb* d_h[1+a_l];
+	limb* s_h[1+a_l];
 	cudaMemcpy(d_h, d_d, (1+a_l)*sizeof(limb*), cudaMemcpyDeviceToHost); CHECK_CUDA_SAFE
 	cudaMemcpy(s_h, s_d, (1+a_l)*sizeof(limb*), cudaMemcpyDeviceToHost); CHECK_CUDA_SAFE
 	
@@ -116,7 +116,7 @@ __host__ void copy_dd(mpv d_d, mpv s_d, u32 n, u32 a_l) {
  */
 __host__ void copy_dh(mpv d, mpv s_d, u32 n, u32 a_l) {
 	// Copy the device pointers for the limb arrays down
-	limb*[1+a_l] s_h;
+	limb* s_h[1+a_l];
 	cudaMemcpy(s_h, s_d, (1+a_l)*sizeof(limb*), cudaMemcpyDeviceToHost); CHECK_CUDA_SAFE
 	
 	// Copy limb arrays across on device
@@ -142,7 +142,7 @@ __host__ mpv expand_d(mpv v_d, u32 n, u32 old_l, u32 alloc_l) {
 	cudaMemcpy(w_d, v_d, (1+old_l)*sizeof(limb*), cudaMemcpyDeviceToDevice); CHECK_CUDA_SAFE
 	
 	// Allocate new data limbs
-	limb*[alloc_l-old_l] w_h;
+	limb* w_h[alloc_l-old_l];
 	for (u32 i = 0; i < alloc_l-old_l; ++i) {
 		cudaMalloc((void**)&w_h[i], n*limb_size); CHECK_CUDA_SAFE
 	}
@@ -162,7 +162,7 @@ __host__ mpv expand_d(mpv v_d, u32 n, u32 old_l, u32 alloc_l) {
  */
 __host__ void clear_d(mpv v_d, u32 alloc_l) {
 	// Copy the device pointers for the limb arrays down
-	limb*[1+alloc_l] v_h;
+	limb* v_h[1+alloc_l];
 	cudaMemcpy(v_h, v_d, (1+alloc_l)*sizeof(limb*), cudaMemcpyDeviceToHost); CHECK_CUDA_SAFE
 	
 	// Free device arrays

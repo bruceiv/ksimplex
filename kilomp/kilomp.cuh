@@ -44,34 +44,34 @@ typedef u32 limb;
 static const u32 limb_size = 4;
 
 /** @return how many limbs does the i'th element of v use */
-inline u32 size(const mpv v, u32 i) {
+DEVICE_HOST inline u32 size(const mpv v, u32 i) {
 	return abs(static_cast<s32>(v[0][i]));
 }
 
 /** @return what is the sign of the i'th element of v */
-inline s32 sign(const mpv v, u32 i) {
+DEVICE_HOST inline s32 sign(const mpv v, u32 i) {
 	s32 u = static_cast<s32>(v[0][i]);
 	return ( u > 0 ) - ( u < 0 );
 }
 
 /** @return do the i'th and j'th elements of v have the same sign */
-inline bool same_sign(const mpv v, u32 i, u32 j) {
+DEVICE_HOST inline bool same_sign(const mpv v, u32 i, u32 j) {
 	//test that the high bits of the sign fields are the same
 	return (((v[0][i] ^ v[0][j]) & 0x80000000) == 0);
 }
 
 /** @return is the i'th element of v zero? */
-inline bool is_zero(const mpv v, u32 i) {
+DEVICE_HOST inline bool is_zero(const mpv v, u32 i) {
 	return v[0][i] == 0;
 }
 
 /** @return is the i'th element of v positive? */
-inline bool is_pos(const mpv v, u32 i) {
+DEVICE_HOST inline bool is_pos(const mpv v, u32 i) {
 	return static_cast<s32>(v[0][i]) > 0;
 }
 
 /** @return is the i'th element of v negative? */
-inline bool is_neg(const mpv v, u32 i) {
+DEVICE_HOST inline bool is_neg(const mpv v, u32 i) {
 	return static_cast<s32>(v[0][i]) < 0;
 }
 
@@ -412,7 +412,7 @@ DEVICE_HOST static void divn_l(mpv v, u32 r, u32 i, u32 j, u32 n, u32 m) {
 	}
 	
 	//divide first m digits of the dividend by the divisor
-	for (u32 k = o; k >= 0; --k) {
+	for (u32 k = o; true; --k) {
 		//determine trial quotient qh
 		u32 qh, rh;
 		u64 t1, t2, t3;
@@ -466,6 +466,8 @@ DEVICE_HOST static void divn_l(mpv v, u32 r, u32 i, u32 j, u32 n, u32 m) {
 		
 		//store final quotient
 		v[k+1][r] = qh;
+		
+		if ( k == 0 ) break;
 	}
 	
 	//un-normalize i'th and j'th elements

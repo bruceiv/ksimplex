@@ -40,7 +40,7 @@ template<u32 blockSize>
 __global__ void posObj_k(kilo::mpv m_d, u32* c_d, u32* o_d, u32 n, u32 d) {
 	
 	// Column index for first entering variable which improves objective
-	__shared__ ind enter[blockSize];
+	__shared__ u32 enter[blockSize];
 	
 	// Get column index
 	u32 tid = threadIdx.x;
@@ -52,7 +52,7 @@ __global__ void posObj_k(kilo::mpv m_d, u32* c_d, u32* o_d, u32 n, u32 d) {
 	if ( tid < d && kilo::is_pos(m_d, obj(tid+1, n, d)) ) {
 		enter[tid] = c_d[tid+1];
 	}
-	for (ind j = tid+blockSize+1; j <= d; j += blockSize) {
+	for (u32 j = tid+blockSize+1; j <= d; j += blockSize) {
 		if ( c_d[j] < enter[tid] && kilo::is_pos(m_d, obj(j, n, d)) ) {
 			enter[tid] = c_d[j];
 		}
@@ -60,7 +60,7 @@ __global__ void posObj_k(kilo::mpv m_d, u32* c_d, u32* o_d, u32 n, u32 d) {
 	__syncthreads();
 	
 	// Reduce (with last warp unrolled)
-	for (ind s = blockSize >> 1; s > 32; s >>= 1) {
+	for (u32 s = blockSize >> 1; s > 32; s >>= 1) {
 		if ( tid < s ) {
 			if ( enter[tid] > enter[tid+s] ) enter[tid] = enter[tid+s];
 		}
@@ -98,7 +98,7 @@ template<u32 blockSize>
 __global__ void minRatio_k(kilo::mpv m_d, u32* u_d, u32 jE, u32* b_d, u32* o_d, u32 n, u32 d) {
 	// Row index for leaving variable which improves objective by maximum 
 	// amount
-	__shared__ ind leave[blockSize];
+	__shared__ u32 leave[blockSize];
 	
 	u32 tid = threadIdx.x;
 	
@@ -120,7 +120,7 @@ __global__ void minRatio_k(kilo::mpv m_d, u32* u_d, u32 jE, u32* b_d, u32* o_d, 
 				s32 rat = kilo::cmp(m_d, t1, t2);
 				
 				// Test ratio
-				if ( rat == -1 || ( rat == 0 && b[iL] < b[iMin] ) ) {
+				if ( rat == -1 || ( rat == 0 && b_d[iL] < b_d[iMin] ) ) {
 					leave[tid] = iL;
 				}
 			}
@@ -129,7 +129,7 @@ __global__ void minRatio_k(kilo::mpv m_d, u32* u_d, u32 jE, u32* b_d, u32* o_d, 
 	__syncthreads();
 	
 	// Reduce
-	for (ind s = blockSize >> 1; s > 0; s >>= 1) {
+	for (u32 s = blockSize >> 1; s > 0; s >>= 1) {
 		if ( tid < s ) {
 			if ( leave[tid+s] != 0 ) {
 				if ( leave[tid] == 0 ) {
@@ -143,7 +143,7 @@ __global__ void minRatio_k(kilo::mpv m_d, u32* u_d, u32 jE, u32* b_d, u32* o_d, 
 					s32 rat = kilo::cmp(m_d, t1, t2);
 				
 					// Test ratio
-					if ( rat == -1 || ( rat == 0 && b[iL] < b[iMin] ) ) {
+					if ( rat == -1 || ( rat == 0 && b_d[iL] < b_d[iMin] ) ) {
 						leave[tid] = iL;
 					}
 				}
@@ -193,7 +193,7 @@ __global__ void pivot_k(kilo::mpv m_d, u32* u_d, u32 jE, u32 iL, u32 n, u32 d) {
 	kilo::mul(m_d, t1, Eij, Mij);
 	kilo::mul(m_d, Eij, Mi, elm(iL, j, n, d));
 	kilo::sub(m_d, t1, Eij);
-	update_max(*u_d, kilo::div(m, Eij, t1, det));  //store # of limbs
+	update_max(*u_d, kilo::div(m_d, Eij, t1, 0));  //store # of limbs
 }
 
 /**
@@ -231,9 +231,8 @@ __global__ void postPivot_k(kilo::mpv m_d, u32 jE, u32 iL, u32* b_d, u32* c_d, u
 		kilo::swap(m_d, 0, Mij);
 		if ( kilo::is_neg(m_d, 0) ) { kilo::neg(m_d, 0); }
 		
-		// Fix basis and cobasis
-		b_d[iL] = enter;
-		c_d[jE] = leave;
+		// Swap basic and cobasic variables
+		u32 t = b_d[iL]; b_d[iL] = c_d[jE]; c_d[jE] = t;
 	}
 }
 
@@ -256,7 +255,7 @@ private:  //internal convenience functions
 	}
 	
 	/** Ensures at least a_n limbs are allocated in the host matrix */
-	void ensure_limbs(u32 a_n) {
+	void ensure_limbs(u32 a_n) const {
 		if ( a_n > a_hl ) {
 			m = kilo::expand(m, m_hl, a_hl, a_n);
 			a_hl = a_n;
@@ -412,8 +411,8 @@ public:	 //public interface
 			m = kilo::init_mpv(m_hl, a_hl);
 		
 			// Allocate basis, cobasis, and matrix storage on device
-			b_d = cudaMalloc((void**)&b_d, (n+1)*sizeof(u32)); CHECK_CUDA_SAFE
-			c_d = cudaMalloc((void**)&c_d, (d+1)*sizeof(u32)); CHECK_CUDA_SAFE
+			cudaMalloc((void**)&b_d, (n+1)*sizeof(u32)); CHECK_CUDA_SAFE
+			cudaMalloc((void**)&c_d, (d+1)*sizeof(u32)); CHECK_CUDA_SAFE
 			m_d = kilo::init_mpv_d(m_dl, a_dl);
 		}
 		
@@ -490,7 +489,7 @@ public:	 //public interface
 		
 		// Perform pivot on device
 		pivot_k<<< n, d >>>(m_d, u_d, jE, iL, n, d); CHECK_CUDA_SAFE
-		postPivot_k<<< 1, 128 >>>(m_d, jE, iL, b_d, c_d, n, d); CHECK_CUDA_SAFE
+		postPivot_k<128><<< 1, 128 >>>(m_d, jE, iL, b_d, c_d, n, d); CHECK_CUDA_SAFE
 		
 		// Fix row and column
 		row[leave] = 0;
@@ -500,7 +499,7 @@ public:	 //public interface
 	}
 
 	/** Get a read-only matrix copy */
-	const kilo::mpv mat() const {
+	kilo::mpv mat() const {
 		ensure_limbs(a_dl);
 		kilo::copy_dh(m, m_d, m_hl, a_dl);
 		return m;
@@ -522,7 +521,7 @@ private:  //class members
 	u32* row;             ///< row indices for variables
 	u32* col;             ///< column indices for variables
 	
-	u32 a_hl;             ///< number of limbs allocated for host matrix
+	mutable u32 a_hl;     ///< number of limbs allocated for host matrix
 	u32 a_dl;             ///< number of limbs allocated for device matrix
 	u32 u_l;              ///< maximum number of limbs used for matrix
 	u32* u_d;             ///< device storage for number of used limbs
