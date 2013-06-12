@@ -13,6 +13,230 @@
 
 namespace ksimplex {
 
+/** @return index of j'th objective function coefficient (j >= 1) */
+__device__ inline u32 obj(u32 j, u32 n, u32 d) { return j+1; }
+/** @return index of constant coefficient of i'th row (i >= 1) */
+__device__ inline u32 con(u32 i, u32 n, u32 d) { return i*(d+1)+1; }
+/** @return index of the j'th coefficient of the i'th row (i, j >= 1) */
+__device__ inline u32 elm(u32 i, u32 j, u32 n, u32 d) { return i*(d+1)+j+1; }
+/** @return index of x'th temp variable (x >= 1) */
+__device__ inline u32 tmp(u32 x, u32 n, u32 d) { return (n+1)*(d+1)+x; }
+/** x is set to the max of x and y */
+__device__ inline void update_max(u32& x, u32 y) { if ( y > x ) x = y; }
+
+/** 
+ * Finds the smallest index of a cobasic variable having a positive objective value. 
+ * Intended to be private to cuda_tableau class; should be called with one block of 2^k threads, 
+ * for some k.
+ *  
+ * @param blockSize  Block size of the invocation
+ * @param m_d        The matrix on device
+ * @param c_d        The cobasis index list on device (should index up to at least d)
+ * @param o_d        Output parameter - will hold the cobasic index (0 for nonesuch)
+ * @param n          The maximum valid row index
+ * @param d          The maximum valid column index
+ */
+template<u32 blockSize> 
+__global__ void posObj_k(kilo::mpv m_d, u32* c_d, u32* o_d, u32 n, u32 d) {
+	
+	// Column index for first entering variable which improves objective
+	__shared__ ind enter[blockSize];
+	
+	// Get column index
+	u32 tid = threadIdx.x;
+	
+	// Initialize reduction to value one higher than maximum
+	enter[tid] = n+d+1;
+	
+	// Check value at this thread's columns
+	if ( tid < d && kilo::is_pos(m_d, obj(tid+1, n, d)) ) {
+		enter[tid] = c_d[tid+1];
+	}
+	for (ind j = tid+blockSize+1; j <= d; j += blockSize) {
+		if ( c_d[j] < enter[tid] && kilo::is_pos(m_d, obj(j, n, d)) ) {
+			enter[tid] = c_d[j];
+		}
+	}
+	__syncthreads();
+	
+	// Reduce (with last warp unrolled)
+	for (ind s = blockSize >> 1; s > 32; s >>= 1) {
+		if ( tid < s ) {
+			if ( enter[tid] > enter[tid+s] ) enter[tid] = enter[tid+s];
+		}
+		
+		__syncthreads();
+	}
+	if ( tid < 32 ) if ( enter[tid] > enter[tid+32] ) enter[tid] = enter[tid+32];
+	if ( tid < 16 ) if ( enter[tid] > enter[tid+16] ) enter[tid] = enter[tid+16];
+	if ( tid <  8 ) if ( enter[tid] > enter[tid+ 8] ) enter[tid] = enter[tid+ 8];
+	if ( tid <  4 ) if ( enter[tid] > enter[tid+ 4] ) enter[tid] = enter[tid+ 4];
+	if ( tid <  2 ) if ( enter[tid] > enter[tid+ 2] ) enter[tid] = enter[tid+ 2];
+	// Combine last step of reduction with output
+	if ( tid == 0 ) {
+		if ( enter[0] > enter[1] ) *o_d = enter[1];
+		else if ( enter[0] == n+d+1 ) *o_d = 0;
+		else *o_d = enter[0];
+	}
+}
+
+/**
+ * Finds the leaving variable which most improves the objective for a given entering variable. 
+ * Intended to be private to cuda_tableau class; should be called with one block of 2^k threads, 
+ * for some k.
+ *  
+ * @param blockSize  Block size of the invocation
+ * @param m_d        The matrix on device
+ * @param u_d        The device-side limb counter
+ * @param jE         Column index of entering variable
+ * @param b_d        Basis buffer on device
+ * @param o_d        Output parameter - will hold the basic index (0 for nonesuch)
+ * @param n          The maximum valid row index
+ * @param d          The maximum valid column index
+ */
+template<u32 blockSize>
+__global__ void minRatio_k(kilo::mpv m_d, u32* u_d, u32 jE, u32* b_d, u32* o_d, u32 n, u32 d) {
+	// Row index for leaving variable which improves objective by maximum 
+	// amount
+	__shared__ ind leave[blockSize];
+	
+	u32 tid = threadIdx.x;
+	
+	// First find min ratios for each thread
+	leave[tid] = 0;
+	u32 t1 = tmp(tid+1, n, d);
+	u32 t2 = tmp(tid+blockSize+1, n, d);
+	
+	for (u32 iL = tid+d+1; iL <= n; iL += blockSize) {  // Ignore decision variables (first d)
+		if ( kilo::is_neg(m_d, elm(iL, jE, n, d)) ) {  // Negative value in entering column
+			if ( leave[tid] == 0 ) {  // First possible leaving variable
+				leave[tid] = iL;
+			} else {  // Test against previous leaving variable
+				u32 iMin = leave[tid];
+				
+				// Compute ratio: rat = M[iMin, 0] * M[iL, jE] <=> M[iL, 0] * M[iMin, jE]
+				kilo::mul(m_d, t1, con(iMin, n, d), elm(iL, jE, n, d));
+				kilo::mul(m_d, t2, con(iL, n, d), elm(iMin, jE, n, d));
+				s32 rat = kilo::cmp(m_d, t1, t2);
+				
+				// Test ratio
+				if ( rat == -1 || ( rat == 0 && b[iL] < b[iMin] ) ) {
+					leave[tid] = iL;
+				}
+			}
+		}
+	}
+	__syncthreads();
+	
+	// Reduce
+	for (ind s = blockSize >> 1; s > 0; s >>= 1) {
+		if ( tid < s ) {
+			if ( leave[tid+s] != 0 ) {
+				if ( leave[tid] == 0 ) {
+					leave[tid] = leave[tid+s];
+				} else {
+					u32 iMin = leave[tid], iL = leave[tid+s];
+					
+					// Compute ratio: rat = M[iMin, 0] * M[iL, jE] <=> M[iL, 0] * M[iMin, jE]
+					kilo::mul(m_d, t1, con(iMin, n, d), elm(iL, jE, n, d));
+					kilo::mul(m_d, t2, con(iL, n, d), elm(iMin, jE, n, d));
+					s32 rat = kilo::cmp(m_d, t1, t2);
+				
+					// Test ratio
+					if ( rat == -1 || ( rat == 0 && b[iL] < b[iMin] ) ) {
+						leave[tid] = iL;
+					}
+				}
+			}
+		}
+		
+		if ( s > 32 ) __syncthreads(); // syncronize up to last warp
+	}
+	
+	// Report minimum ratio
+	if ( tid == 0 ) {
+		*o_d = b_d[leave[0]];
+	}
+}
+
+/**
+ * Pivots the tableau on device. Substitues all values but those in the leaving row and entering 
+ * column. Intended to be private to cuda_tableau class; should be called with n blocks of d 
+ * threads.
+ * 
+ * @param m_d  The matrix on device
+ * @param u_d  The device-side limb counter
+ * @param jE   Column index of the entering variable
+ * @param iL   Row index of the leaving variable
+ * @param n    The maximum valid row index
+ * @param d    The maximum valid column index
+ */
+__global__ void pivot_k(kilo::mpv m_d, u32* u_d, u32 jE, u32 iL, u32 n, u32 d) {
+	// Get row and column indices
+	u32 i = blockIdx.x;
+	u32 j = threadIdx.x;
+	u32 t1 = tmp((i*d)+j+1, n, d);
+	
+	// Keep sign of M[iL,jE] in det (0)
+	u32 Mij = elm(iL, jE, n, d);
+	if ( i == 0 && j == 0 ) {
+		if ( kilo::is_neg(m_d, Mij) ) { kilo::neg(m_d, 0); }
+	}
+	
+	// Skip row/column of pivot
+	if ( i >= iL ) ++i;
+	if ( j >= jE ) ++j;
+	
+	// Rescale all other elements
+	u32 Mi = elm(i, jE, n, d), Eij = elm(i, j, n, d);
+	// M[i,j] = ( M[i,j]*M[iL,jE] - M[i,jE]*M[iL,j] )/det
+	kilo::mul(m_d, t1, Eij, Mij);
+	kilo::mul(m_d, Eij, Mi, elm(iL, j, n, d));
+	kilo::sub(m_d, t1, Eij);
+	update_max(*u_d, kilo::div(m, Eij, t1, det));  //store # of limbs
+}
+
+/**
+ * Cleans up the tableau after a pivot. Fixes values in leaving row, entering column, and 
+ * determinant, as well as swapping basic and cobasic variables. Intended to be private to 
+ * cuda_tableau class; should be called with 1 block of blockSize threads.
+ * 
+ * @param blockSize  Block size of the invocation
+ * @param m_d        The matrix on device
+ * @param jE         Column index of the entering variable
+ * @param iL         Row index of the leaving variable 
+ * @param b_d        The basis buffer on device
+ * @param c_d        The cobasis buffer on device
+ * @param n          The maximum valid row index
+ * @param d          The maximum valid column index
+ */
+template<u32 blockSize>
+__global__ void postPivot_k(kilo::mpv m_d, u32 jE, u32 iL, u32* b_d, u32* c_d, u32 n, u32 d) {
+	u32 tid = threadIdx.x;
+	u32 Mij = elm(iL, jE, n, d);
+	
+	// Recalculate pivot row/column
+	if ( kilo::is_pos(m_d, Mij) ) {
+		for (u32 j = tid; j <= d; j += blockSize) {
+			kilo::neg(m_d, elm(iL, j, n, d));
+		}
+	} else {
+		for (u32 i = tid; i <= n; i += blockSize) {
+			kilo::neg(m_d, elm(i, jE, n, d));
+		}
+	}
+	
+	if ( tid == 0 ) {
+		// Reset pivot element, determinant
+		kilo::swap(m_d, 0, Mij);
+		if ( kilo::is_neg(m_d, 0) ) { kilo::neg(m_d, 0); }
+		
+		// Fix basis and cobasis
+		b_d[iL] = enter;
+		c_d[jE] = leave;
+	}
+}
+
 class cuda_tableau {
 private:  //internal convenience functions
 	
@@ -67,10 +291,11 @@ public:	 //public interface
 		col = new u32[n+d+1];
 		m = kilo::init_mpv(m_hl, a_hl);
 		
-		// Allocate limb count, basis, cobasis, and matrix storage on device
-		u_d = cudaMalloc((void**)&u_d, sizeof(u32)); CHECK_CUDA_SAFE
-		b_d = cudaMalloc((void**)&b_d, (n+1)*sizeof(u32)); CHECK_CUDA_SAFE
-		c_d = cudaMalloc((void**)&c_d, (d+1)*sizeof(u32)); CHECK_CUDA_SAFE
+		// Allocate limb count, output buffer, basis, cobasis, and matrix storage on device
+		cudaMalloc((void**)&u_d, sizeof(u32)); CHECK_CUDA_SAFE
+		cudaMalloc((void**)&o_d, sizeof(u32)); CHECK_CUDA_SAFE
+		cudaMalloc((void**)&b_d, (n+1)*sizeof(u32)); CHECK_CUDA_SAFE
+		cudaMalloc((void**)&c_d, (d+1)*sizeof(u32)); CHECK_CUDA_SAFE
 		m_d = kilo::init_mpv_d(m_dl, a_dl);
 		
 		u32 i, j, r_i, c_j;
@@ -116,10 +341,11 @@ public:	 //public interface
 		col = new u32[n+d+1];
 		m = kilo::init_mpv(m_hl, a_hl);
 		
-		// Allocate limb count, basis, cobasis, and matrix storage on device
-		u_d = cudaMalloc((void**)&u_d, sizeof(u32)); CHECK_CUDA_SAFE
-		b_d = cudaMalloc((void**)&b_d, (n+1)*sizeof(u32)); CHECK_CUDA_SAFE
-		c_d = cudaMalloc((void**)&c_d, (d+1)*sizeof(u32)); CHECK_CUDA_SAFE
+		// Allocate limb count, output buffer, basis, cobasis, and matrix storage on device
+		cudaMalloc((void**)&u_d, sizeof(u32)); CHECK_CUDA_SAFE
+		cudaMalloc((void**)&o_d, sizeof(u32)); CHECK_CUDA_SAFE
+		cudaMalloc((void**)&b_d, (n+1)*sizeof(u32)); CHECK_CUDA_SAFE
+		cudaMalloc((void**)&c_d, (d+1)*sizeof(u32)); CHECK_CUDA_SAFE
 		m_d = kilo::init_mpv_d(m_dl, a_dl);
 		
 		// Copy row and column on host
@@ -144,6 +370,7 @@ public:	 //public interface
 		
 		// Clear device-side storage
 		cudaFree(u_d); CHECK_CUDA_SAFE
+		cudaFree(o_d); CHECK_CUDA_SAFE
 		cudaFree(b_d); CHECK_CUDA_SAFE
 		cudaFree(c_d); CHECK_CUDA_SAFE
 		kilo::clear_d(m_d, a_dl);
@@ -211,53 +438,31 @@ public:	 //public interface
 	 */
 	pivot ratioTest() {
 		// Look for entering variable
-		u32 enter = 0;
+		u32 enter = 0, leave = 0, jE;
 		
-		u32 i, iL, j, jE;
-		
-		// Find first cobasic variable with positive objective value
-		for (j = 1; j <= n+d; ++j) {
-			jE = col[j];  // Get column index of variable j
-			
-			// Check that objective value for j is positive
-			if ( jE != 0 && kilo::is_pos(m, obj(jE)) ) {
-				enter = j;
-				break;
-			}
-		}
+		// Find first cobasic variable with positive objective value on device
+		posObj_k<32><<< 1, 32 >>>(m_d, c_d, o_d, n, d); CHECK_CUDA_SAFE
+		cudaMemcpy(&enter, o_d, sizeof(u32), cudaMemcpyDeviceToHost); CHECK_CUDA_SAFE
 		
 		// If no increasing variables found, this is optimal
 		if ( enter == 0 ) return tableau_optimal;
+		jE = col[enter];
 		
-		u32 iMin = 0;
-		u32 leave = 0;
-		u32 t1 = tmp(1);
-		u32 t2 = tmp(2);
+		ensure_temp_space_d();  // Ensure enough space in device temporary variables
 		
-		ensure_limbs(u_l*2);  // Make sure enough space in temp variables
-		
-		for (iL = d+1; iL <= n; ++iL) {  // Ignore decision variables (first d)
-			if ( kilo::is_neg(m, elm(iL, jE)) ) {  // Negative value in entering column
-				if ( leave == 0 ) {  // First possible leaving variable
-					iMin = iL;
-					leave = b[iL];
-				} else {  // Test against previous leaving variable
-					i = b[iL];
-					
-					//compute ratio: rat = M[iMin, 0] * M[iL, jE] <=> M[iL, 0] * M[iMin, jE]
-					kilo::mul(m, t1, con(iMin), elm(iL, jE));
-					kilo::mul(m, t2, con(iL), elm(iMin, jE));
-					s32 rat = kilo::cmp(m, t1, t2);
-					
-					//test ratio
-					if ( rat == -1 || ( rat == 0 && i < leave ) ) {
-						iMin = iL;
-						leave = i;
-					}
-				}
-			}
-		}
-		
+		// Find minimum ratio for entering variable, choosing good block size for coalescing
+		if ( n < 128 )
+			minRatio_k<32><<< 1,32 >>>(m_d, u_d, jE, b_d, o_d, n, d); CHECK_CUDA_SAFE
+		else if ( n < 256 )
+			minRatio_k<64><<< 1,64 >>>(m_d, u_d, jE, b_d, o_d, n, d); CHECK_CUDA_SAFE
+		else if ( n < 512 )
+			minRatio_k<128><<< 1,128 >>>(m_d, u_d, jE, b_d, o_d, n, d); CHECK_CUDA_SAFE
+		else if ( n < 1024 )
+			minRatio_k<256><<< 1,256 >>>(m_d, u_d, jE, b_d, o_d, n, d); CHECK_CUDA_SAFE
+		else /* if ( n >= 1024 ) */
+			minRatio_k<512><<< 1,512 >>>(m_d, u_d, jE, b_d, o_d, n, d); CHECK_CUDA_SAFE
+		cudaMemcpy(&leave, o_d, sizeof(u32), cudaMemcpyDeviceToHost); CHECK_CUDA_SAFE
+				
 		// If no limiting variables found, this is unbounded
 		if ( leave == 0 ) return tableau_unbounded;
 		
@@ -271,58 +476,23 @@ public:	 //public interface
 	 * variable is cobasic, leaving variable is basic, and coefficient of the entering variable in 
 	 * the equation defining the leaving variable is non-zero).
 	 * 
-	 * @param enter		The index to enter the basis
-	 * @param leave		The index to leave the basis
+	 * @param enter      The index to enter the basis
+	 * @param leave      The index to leave the basis
+	 * @param has_space  Has space for the calculation been ensured (yes if ratioTest() was the 
+	 *                   last call) [true]
 	 */
-	void doPivot(u32 enter, u32 leave) {
+	void doPivot(u32 enter, u32 leave, bool has_space = true) {
 		u32 iL = row[leave];  // Leaving row
 		u32 jE = col[enter];  // Entering column
 		
-		u32 i, j;
-		u32 t1 = tmp(1);
+		// Make sure enough space (generally done by ratioTest())
+		if ( ! has_space ) ensure_temp_space_d();
 		
-		ensure_limbs(u_l*2);       // Make sure enough space in temp variables
+		// Perform pivot on device
+		pivot_k<<< n, d >>>(m_d, u_d, jE, iL, n, d); CHECK_CUDA_SAFE
+		postPivot_k<<< 1, 128 >>>(m_d, jE, iL, b_d, c_d, n, d); CHECK_CUDA_SAFE
 		
-		// Keep sign of M[iL,jE] in det
-		u32 Mij = elm(iL, jE);
-		if ( kilo::is_neg(m, Mij) ) { kilo::neg(m, det); }
-		
-		// Recalculate matrix elements outside of pivot row/column
-		for (i = 0; i <= n; ++i) {
-			if ( i == iL ) continue;
-			
-			u32 Mi = elm(i, jE);
-			for (j = 0; j <= d; ++j) {
-				if ( j == jE ) continue;
-				
-				u32 Eij = elm(i, j);
-				
-				// M[i,j] = ( M[i,j]*M[iL,jE] - M[i,jE]*M[iL,j] )/det
-				kilo::mul(m, t1, Eij, Mij);
-				kilo::mul(m, Eij, Mi, elm(iL, j));
-				kilo::sub(m, t1, Eij);
-				count_limbs(kilo::div(m, Eij, t1, det));  //store # of limbs
-			}
-		}
-		
-		// Recalculate pivot row/column
-		if ( kilo::is_pos(m, Mij) ) {
-			for (j = 0; j <= d; ++j) {
-				kilo::neg(m, elm(iL, j));
-			}
-		} else { // M[iL,jE] < 0 -- == 0 case is ruled out by pre-assumptions
-			for (i = 0; i <= n; ++i) {
-				kilo::neg(m, elm(i, jE));
-			}
-		}
-		
-		// Reset pivot element, determinant
-		kilo::swap(m, det, Mij);
-		if ( kilo::is_neg(m, det) ) { kilo::neg(m, det); }
-		
-		// Fix basis, cobasis, row, and column
-		b[iL] = enter;
-		c[jE] = leave;
+		// Fix row and column
 		row[leave] = 0;
 		row[enter] = iL;
 		col[enter] = 0;
@@ -330,7 +500,11 @@ public:	 //public interface
 	}
 
 	/** Get a read-only matrix copy */
-	const kilo::mpv mat() const { return m; }
+	const kilo::mpv mat() const {
+		ensure_limbs(a_dl);
+		kilo::copy_dh(m, m_d, m_hl, a_dl);
+		return m;
+	}
 	
 private:  //class members
 	u32 n;                ///< number of equations in tableau
@@ -338,6 +512,7 @@ private:  //class members
 	
 	u32* b_d;             ///< basis on device
 	u32* c_d;             ///< cobasis on device
+	u32* o_d;             ///< output parameter on device
 	kilo::mpv m_d;        ///< tableau matrix on device
 	
 	mutable u32* b;       ///< host-side basis variable buffer
