@@ -67,11 +67,11 @@ __global__ void posObj_k(kilo::mpv m_d, u32* c_d, u32* o_d, u32 n, u32 d) {
 		
 		__syncthreads();
 	}
-	if ( tid < 32 ) if ( enter[tid] > enter[tid+32] ) enter[tid] = enter[tid+32];
-	if ( tid < 16 ) if ( enter[tid] > enter[tid+16] ) enter[tid] = enter[tid+16];
-	if ( tid <  8 ) if ( enter[tid] > enter[tid+ 8] ) enter[tid] = enter[tid+ 8];
-	if ( tid <  4 ) if ( enter[tid] > enter[tid+ 4] ) enter[tid] = enter[tid+ 4];
-	if ( tid <  2 ) if ( enter[tid] > enter[tid+ 2] ) enter[tid] = enter[tid+ 2];
+	if ( blockSize >= 64 && tid < 32 && enter[tid] > enter[tid+32] ) enter[tid] = enter[tid+32];
+	if ( blockSize >= 32 && tid < 16 && enter[tid] > enter[tid+16] ) enter[tid] = enter[tid+16];
+	if ( blockSize >= 16 && tid <  8 && enter[tid] > enter[tid+ 8] ) enter[tid] = enter[tid+ 8];
+	if ( blockSize >=  8 && tid <  4 && enter[tid] > enter[tid+ 4] ) enter[tid] = enter[tid+ 4];
+	if ( blockSize >=  4 && tid <  2 && enter[tid] > enter[tid+ 2] ) enter[tid] = enter[tid+ 2];
 	// Combine last step of reduction with output
 	if ( tid == 0 ) {
 		if ( enter[0] > enter[1] ) *o_d = enter[1];
@@ -450,16 +450,17 @@ public:	 //public interface
 		ensure_temp_space_d();  // Ensure enough space in device temporary variables
 		
 		// Find minimum ratio for entering variable, choosing good block size for coalescing
-		if ( n < 128 )
+		if ( n < 128 ) {
 			minRatio_k<32><<< 1,32 >>>(m_d, u_d, jE, b_d, o_d, n, d); CHECK_CUDA_SAFE
-		else if ( n < 256 )
+		} else if ( n < 256 ) {
 			minRatio_k<64><<< 1,64 >>>(m_d, u_d, jE, b_d, o_d, n, d); CHECK_CUDA_SAFE
-		else if ( n < 512 )
+		} else if ( n < 512 ) {
 			minRatio_k<128><<< 1,128 >>>(m_d, u_d, jE, b_d, o_d, n, d); CHECK_CUDA_SAFE
-		else if ( n < 1024 )
+		} else if ( n < 1024 ) {
 			minRatio_k<256><<< 1,256 >>>(m_d, u_d, jE, b_d, o_d, n, d); CHECK_CUDA_SAFE
-		else /* if ( n >= 1024 ) */
+		} else /* if ( n >= 1024 ) */ {
 			minRatio_k<512><<< 1,512 >>>(m_d, u_d, jE, b_d, o_d, n, d); CHECK_CUDA_SAFE
+		}
 		cudaMemcpy(&leave, o_d, sizeof(u32), cudaMemcpyDeviceToHost); CHECK_CUDA_SAFE
 				
 		// If no limiting variables found, this is unbounded
