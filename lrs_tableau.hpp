@@ -51,6 +51,12 @@ public:
 		
 		return v;
 	}
+	
+	/** @return the objective value of this tableau */
+	const lrs::val_t& obj() const { return l.elem(0, d); }
+	
+	/** @return the determinant of this tableau */
+	const lrs::val_t& det() const { return l.getDeterminant(); }
 private:
 	lrs::lrs& l;  ///< The LRS wrapper object
 	u32 n;        ///< number of equations in tableau

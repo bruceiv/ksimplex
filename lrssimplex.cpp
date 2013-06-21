@@ -7,6 +7,9 @@
 
 #include <iostream>
 #include <string>
+#include <sstream>
+
+#include <gmpxx.h>
 
 #include "lrs_io.hpp"
 #include "lrs_tableau.hpp"
@@ -55,10 +58,22 @@ int main(int argc, char** argv) {
 	ksimplex::pivot p = simplexSolve(tab, &pivot_count, std::cout);
 	timer end = now();
 	
+	std::string max;
 	if ( p == tableau_optimal ) {
 		std::cout << "tableau: OPTIMAL" << std::endl;
+		
+		// set maximum
+		mpq_class opt;
+		opt.get_num() = mpz_class(tab.obj());
+		opt.get_den() = mpz_class(tab.det());
+		opt.canonicalize();
+		
+		std::stringstream ss;
+		ss << opt;
+		ss >> max;
 	} else if ( p == tableau_unbounded ) {
 		std::cout << "tableau: UNBOUNDED" << std::endl;
+		max = "UNBOUNDED";
 	}
 	
 	// Print final tableau
@@ -68,6 +83,7 @@ int main(int argc, char** argv) {
 	std::cout << "\nn:        " << n
 	          << "\nd:        " << d
 	          << "\npivots:   " << pivot_count
+	          << "\noptimal:  " << max
 	          << "\ntime(ms): " << ms_between(start, end) << std::endl;
 	
 	//Cleanup
