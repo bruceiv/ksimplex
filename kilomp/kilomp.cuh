@@ -137,8 +137,7 @@ DEVICE_HOST mpv expand(mpv v, u32 n, u32 old_l, u32 alloc_l) {
 	
 	//replace v with w
 	free(v);
-	v = w;
-	return v;
+	return w;
 }
 
 /**

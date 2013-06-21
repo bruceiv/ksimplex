@@ -4,6 +4,7 @@
 
 # compiler flags
 CXXFLAGS = -O2 -Wall -Wno-unused-function
+#CXXFLAGS = -O0 -ggdb -Wall -Wno-unused-function
 # LRS compiler flags
 LRSCXXFLAGS = $(CXXFLAGS) -DTIMES -DGMP -DLRS_QUIET
 # CUDA compiler flags
