@@ -10,6 +10,7 @@
 #include "kmp_tableau.hpp"
 #include "ksimplex.hpp"
 #include "simplex.hpp"
+#include "timing.hpp"
 
 #include "kilomp/kilomp.cuh"
 
@@ -155,7 +156,9 @@ int main(int argc, char **argv) {
 	
 	// Run simplex algorithm
 	u32 pivot_count = 0;
+	timer start = now();
 	pivot p = simplexSolve(tab, &pivot_count, std::cout);
+	timer end = now();
 	
 	if ( p == tableau_optimal ) {
 		std::cout << "tableau: OPTIMAL" << std::endl;
@@ -165,6 +168,12 @@ int main(int argc, char **argv) {
 	
 	// Print final tableau
 	printMatrix(tab.mat(), n, d, std::cout);
+	
+	// Print summary information
+	std::cout << "\nn:        " << n
+	          << "\nd:        " << d
+	          << "\npivots:   " << pivot_count
+	          << "\ntime(ms): " << ms_between(start, end) << std::endl;
 	
 	// Cleanup
 	delete[] cob;
