@@ -666,7 +666,7 @@ namespace {
 /** 
  * Converts half-byte values to corresponding hex characters.
  * @param i		half-byte value to convert
- * @return corresponding hexadecimal character (uppercase), or '_' if 
+ * @return corresponding hexadecimal character (lowercase), or '_' if 
  * 		nonesuch.
  */
 DEVICE_HOST char ch(int i) {
@@ -681,12 +681,12 @@ DEVICE_HOST char ch(int i) {
 	case 7: return '7';
 	case 8: return '8';
 	case 9: return '9';
-	case 10: return 'A';
-	case 11: return 'B';
-	case 12: return 'C';
-	case 13: return 'D';
-	case 14: return 'E';
-	case 15: return 'F';
+	case 10: return 'a';
+	case 11: return 'b';
+	case 12: return 'c';
+	case 13: return 'd';
+	case 14: return 'e';
+	case 15: return 'f';
 	default: return '_';
 	}
 }
