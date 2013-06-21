@@ -7,7 +7,6 @@
 
 #include <iostream>
 #include <string>
-#include <sstream>
 
 #include <gmpxx.h>
 
@@ -67,10 +66,7 @@ int main(int argc, char** argv) {
 		opt.get_num() = mpz_class(tab.obj());
 		opt.get_den() = mpz_class(tab.det());
 		opt.canonicalize();
-		
-		std::stringstream ss;
-		ss << opt;
-		ss >> max;
+		max = opt.get_str();
 	} else if ( p == tableau_unbounded ) {
 		std::cout << "tableau: UNBOUNDED" << std::endl;
 		max = "UNBOUNDED";

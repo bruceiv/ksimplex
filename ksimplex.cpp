@@ -6,6 +6,9 @@
 
 #include <iostream>
 #include <string>
+#include <sstream>
+
+#include <gmpxx.h>
 
 #include "kmp_tableau.hpp"
 #include "ksimplex.hpp"
@@ -160,10 +163,22 @@ int main(int argc, char **argv) {
 	pivot p = simplexSolve(tab, &pivot_count, std::cout);
 	timer end = now();
 	
+	std::string max;
 	if ( p == tableau_optimal ) {
 		std::cout << "tableau: OPTIMAL" << std::endl;
+		
+		// generate max
+		std::stringstream ss;
+		print(tab.mat(), 1, ss);
+		ss << "/";
+		print(tab.mat(), 0, ss);
+		
+		mpq_class opt(ss.str(), 16);
+		opt.canonicalize();
+		max = opt.get_str();
 	} else if ( p == tableau_unbounded ) {
 		std::cout << "tableau: UNBOUNDED" << std::endl;
+		max = "UNBOUNDED";
 	}
 	
 	// Print final tableau
@@ -173,6 +188,8 @@ int main(int argc, char **argv) {
 	std::cout << "\nn:        " << n
 	          << "\nd:        " << d
 	          << "\npivots:   " << pivot_count
+	          << "\npivots:   " << pivot_count
+	          << "\noptimal:  " << max
 	          << "\ntime(ms): " << ms_between(start, end) << std::endl;
 	
 	// Cleanup
