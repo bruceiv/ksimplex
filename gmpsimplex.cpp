@@ -7,12 +7,13 @@
 #include <iostream>
 #include <string>
 
-#include <gmp.h>
+#include <gmpxx.h>
 
 #include "gmp_tableau.hpp"
 #include "gmpv.hpp"
 #include "ksimplex.hpp"
 #include "simplex.hpp"
+#include "timing.hpp"
 
 using namespace ksimplex;
 
@@ -126,16 +127,45 @@ int main(int argc, char **argv) {
 	
 	// Run simplex algorithm
 	u32 pivot_count = 0;
-	pivot p = simplexSolve(tab, &pivot_count, std::cout);
+	timer start = now();
+//	pivot p = simplexSolve(tab, &pivot_count, std::cout);
+	// Get first pivot
+	pivot p = tab.ratioTest();
+	// Pivot as long as more pivots exist
+	while ( p != tableau_optimal && p != tableau_unbounded ) {
+		std::cout << "(" << p.leave << "," << p.enter << ")" << std::endl;
+		tab.doPivot(p.enter, p.leave);
+		++pivot_count;
+		printMatrix(tab.mat(), n, d, std::cout);
+		p = tab.ratioTest();
+	}
 	
+	timer end = now();
+	
+	std::string max;
 	if ( p == tableau_optimal ) {
 		std::cout << "tableau: OPTIMAL" << std::endl;
+		
+		// set maximum
+		mpq_class opt;
+		opt.get_num() = mpz_class(tab.mat()[1]);
+		opt.get_den() = mpz_class(tab.mat()[0]);
+		opt.canonicalize();
+		max = opt.get_str();
 	} else if ( p == tableau_unbounded ) {
 		std::cout << "tableau: UNBOUNDED" << std::endl;
+		max = "UNBOUNDED";
 	}
 	
 	// Print final tableau
 	printMatrix(tab.mat(), n, d, std::cout);
+	
+	// Print summary information
+	std::cout << "\nn:        " << n
+	          << "\nd:        " << d
+	          << "\npivots:   " << pivot_count
+	          << "\noptimal:  " << max
+	          << "\ntime(ms): " << ms_between(start, end) << std::endl;
 	
 	// Cleanup
 	delete[] cob;
