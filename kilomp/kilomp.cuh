@@ -75,6 +75,11 @@ DEVICE_HOST inline bool is_neg(const mpv v, u32 i) {
 	return static_cast<s32>(v[0][i]) < 0;
 }
 
+/** @return cond ? -x : x */
+DEVICE_HOST inline u32 neg_if(u32 x, bool cond) {
+	return (x ^ -cond) + cond;
+}
+
 /**
  * Initializes a mp-vector.
  * @param n			The number of elements in the vector
@@ -506,7 +511,7 @@ DEVICE_HOST static u32 add(mpv v, u32 i, u32 j) {
 		
 		//reset length -- k, accounting for the possibility of no carry, with the previous sign
 		u32 r = k - (c == 0);
-		v[0][i] = r * sign(v, i);
+		v[0][i] = neg_if(r, is_neg(v, i));
 		return r;
 		
 	} else {  //opposite signs, subtract
@@ -588,7 +593,7 @@ DEVICE_HOST static u32 sub(mpv v, u32 i, u32 j) {
 		
 		//reset length -- k, accounting for the possibility of no carry, with the previous sign
 		u32 r = k - (c == 0);
-		v[0][i] = r * sign(v, i);
+		v[0][i] = neg_if(r, is_neg(v, i));
 		return r;
 		
 	}
