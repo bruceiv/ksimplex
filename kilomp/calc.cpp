@@ -14,12 +14,14 @@
  *            | var '=' var '*' var  # set first variable to the product of second and third
  *            | var '=' var '/' var  # set first variable to quotient of second and third
  *                                   # - remainder will be stored in second variable
+ *            | "hex" var            # print values of underlying array for debugging
  * var       := '$' [0-9]
  * hexstring := '-'? [0-9A-Fa-f]+
  * 
  * @author Aaron Moss
  */
 
+#include <iomanip>
 #include <iostream>
 #include <string>
 #include <sstream>
@@ -66,6 +68,17 @@ struct mp_vars {
 		//print into buffer, then stdout
 		kilo::print(vs,i,buf);
 		std::cout << buf << std::endl;
+	}
+	
+	/** Prints the hex values of the underlying array of the i'th element to standard output. */
+	void hex(kilo::u32 i) {
+		std::cout << "[";
+		std::ios_base::fmtflags f = std::cout.flags();
+		for (kilo::u32 j = 0; j <= l; ++j) {
+			std::cout << " " << std::hex << std::setfill('0') << std::setw(8) << vs[j][i];
+		}
+		std::cout.flags(f);
+		std::cout << " ]" << std::endl;
 	}
 }; /* struct mp_vars */
 
@@ -245,6 +258,26 @@ void parse_cmd(std::string line, mp_vars& vars) {
 		}
 		
 		std::cout << kilo::cmp(vars.vs, v1, v2) << std::endl;
+		return;
+	} else if ( s == std::string("hex") ) {  // handle hex command
+		if ( in.eof() ) {
+			std::cerr << "Expected arguments to `hex'" << std::endl;
+			return;
+		}
+		
+		in >> s;
+		v1 = parse_var(s);
+		if ( v1 == not_var ) {
+			std::cerr << "`" << s << "' is not a variable - expects '$' [0-9]" << std::endl;
+			return;
+		}
+		
+		if ( ! in.eof() ) {
+			std::cerr << "Too many arguments - expected nothing after `" << s << "'" << std::endl;
+			return;
+		}
+		
+		vars.hex(v1);
 		return;
 	}
 	
