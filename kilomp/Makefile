@@ -12,5 +12,8 @@ fixed_width.hpp:  fixed_width.cpp
 calc:  calc.cpp kilomp.cuh fixed_width.hpp
 	${CXX} ${CXXFLAGS} -o calc calc.cpp ${LDFLAGS}
 
-test:  test.cpp kilomp.cuh fixed_width.hpp
+test:  test.cpp kilomp.cuh fixed_width.hpp kmp_tests.txt
 	${CXX} ${CXXFLAGS} -o test test.cpp ${GMPLDFLAGS}
+	./test < kmp_tests.txt
+	rm test
+

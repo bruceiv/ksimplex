@@ -140,6 +140,7 @@ int main(int argc, char** argv) {
 	int tests_total = 0, tests_passed = 0;
 	
 	while ( std::getline(std::cin, line) ) {
+		if ( line.size() == 0 ) continue;
 		if ( '#' == line[0] ) continue;
 		
 		std::stringstream ss(line);
