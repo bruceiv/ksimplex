@@ -17,3 +17,6 @@ test:  test.cpp kilomp.cuh fixed_width.hpp kmp_tests.txt
 	./test < kmp_tests.txt
 	rm test
 
+fuzz:  fuzz.cpp
+	${CXX} ${CXXFLAGS} -o fuzz fuzz.cpp ${GMPLDFLAGS}
+

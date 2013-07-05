@@ -31,9 +31,9 @@ private:
 		// ensures sufficient limbs in kilomp vector
 		kilo::u32 len = ( a.size() >= b.size() ) ? a.size() : b.size();
 		kilo::u32 limbs = (len+7)/8;
-		if ( limbs > l ) {
-			kops = kilo::expand(kops, 3, l, 2*limbs);
-			l = 2*limbs;
+		if ( 2*limbs > l ) {
+			kops = kilo::expand(kops, 3, l, 4*limbs);
+			l = 4*limbs;
 		}
 		
 		// reads kilomp values
@@ -155,7 +155,7 @@ int main(int argc, char** argv) {
 		case '-': test.sub(val1, val2); break;
 		case '*': test.mul(val1, val2); break;
 		case '/': test.div(val1, val2); break;
-		default: std::cout << "SYNTAX ERROR: `" << line << "'" << std::endl; continue;
+		default: std::cout << "SYNTAX ERROR: `" << line << "'\n" << std::endl; continue;
 		}
 		
 		kres = test.get_kilomp();
@@ -163,8 +163,10 @@ int main(int argc, char** argv) {
 		
 		++tests_total;
 		if ( kres == gres ) ++tests_passed;
-		else std::cout << "EXPECTED " << gres << " GOT " << kres
-		               << " FOR " << val1 << " " << op << " " << val2 << std::endl;
+		else std::cout << "FOR " << val1 << " " << op << " " << val2 << "\n"
+		               << "\tEXPECTED " << gres << "\n"
+		               << "\tRECEIVED " << kres << "\n"
+		               << std::endl;
 	}
 	
 	std::cout << tests_passed << "/" << tests_total << " tests passed" << std::endl;
