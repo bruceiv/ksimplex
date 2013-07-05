@@ -250,9 +250,9 @@ namespace {
 DEVICE_HOST static u32 add_l(mpv v, u32 r, u32 i, u32 j, u32 n) {
 	u32 c = 0;
 	for (u32 k = 1; k <= n; ++k) {
-		u32 t = v[k][i] + v[k][j];                 //overflow iff v[k][i] > t or v[k][j] > t
-		v[k][r] = t + c;                           //overflow iff t = 2**32 - 1 and c = 1
-		c = (t < v[k][i]) | (c & (v[k][r] == 0));  //check overflow
+		u32 t = v[k][i] + c;                   // overflow iff c == 1 and t == 0
+		v[k][r] = t + v[k][j];                 // overflow iff v[k][r] < t
+		c = ( v[k][r] < t ) | (c & (t == 0));  // recalculate carry flag
 	}
 	return c;
 }
