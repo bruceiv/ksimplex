@@ -268,13 +268,17 @@ DEVICE_HOST static u32 add_l(mpv v, u32 r, u32 i, u32 j, u32 n) {
  * @return the borrow bit from the last subtraction
  */
 DEVICE_HOST static u32 sub_l(mpv v, u32 r, u32 i, u32 j, u32 n) {
-	int b = 0;
+	u32 c = 1;                                  // not-borrow - 1 for no borrow, 0 for borrow
 	for (u32 k = 1; k <= n; ++k) {
-		u32 t = v[k][i] - v[k][j];           //underflow iff t > v[k][i]
-		v[k][r] = t - b;                     //underflow if t = 0 and b = 1
-		b = (t > v[k][i]) | (b & (t == 0));  //check underflow
+		u32 t = v[k][i] + c;                    // add 1 to v[k][i] if not borrowing
+		v[k][r] = t - v[k][j];                  // subtract v[k][j] from modified v[k][i]
+		v[k][r] -= 1;                           // perform borrow
+		c = ( v[k][r] <= t ) | (c & (t == 0));  // recalculate not-borrow flag
+		                                        // if result is <= t, didn't underflow on subtract
+		                                        // if no borrow and t == 0, v[i][j] == MAX, can't
+		                                        // underflow 
 	}
-	return b;
+	return !c;
 }
 
 /** 
