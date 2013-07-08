@@ -146,5 +146,18 @@ void printMatrix(const lrs::vector_mpz& m, u32 n, u32 d, std::ostream& out) {
 	out.flags(flags);
 }
 
+
+void printMatrix(const lrs::matrix_mpq& m, std::ostream& out) {
+	std::ios_base::fmtflags flags = out.flags();
+	out << std::hex;
+	for (u32 i = 0; i < m.size(); ++i) {
+		for (u32 j = 0; j < m.dim(); ++j) {
+			out << " " << m.elem(i, j);
+		}
+		out << std::endl;
+	}
+	out.flags(flags);
+}
+
 } /* namespace ksimplex */
 
