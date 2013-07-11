@@ -178,7 +178,7 @@ public:	 //public interface
 		
 		u32 i, iL, j, jE;
 		
-		// Find first cobasic variable with positive objective value
+/*		// Find first cobasic variable with positive objective value
 		for (j = 1; j <= n+d; ++j) {
 			jE = col[j];  // Get column index of variable j
 			
@@ -188,7 +188,27 @@ public:	 //public interface
 				break;
 			}
 		}
-		
+*/		
+		// Find cobasic variable with maximum positive objective value (break ties by lex-order)
+		jE = 0;
+		for (j = 1; j <= d; ++j) {
+			// Ensure objective value is positive
+			if ( kilo::is_pos(m, obj(j)) ) {
+				if ( enter == 0 ) {
+					// this is the first positive value
+					jE = j;
+					enter = c[j];
+				} else {
+					// Check that j has a larger objective value, or the same and a lower index
+					s32 t = kilo::cmp(m, obj(j), obj(jE));
+					if ( t > 0 || (t == 0 && c[j] < enter) ) {
+						jE = j;
+						enter = c[j];
+					}
+				}
+			}
+		}
+				
 		// If no increasing variables found, this is optimal
 		if ( enter == 0 ) return tableau_optimal;
 		

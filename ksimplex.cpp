@@ -160,17 +160,17 @@ int main(int argc, char **argv) {
 	// Run simplex algorithm
 	u32 pivot_count = 0;
 	timer start = now();
-	pivot p = simplexSolve(tab, &pivot_count, std::cout);
-//	// Get first pivot
-//	pivot p = tab.ratioTest();
-//	// Pivot as long as more pivots exist
-//	while ( p != tableau_optimal && p != tableau_unbounded ) {
-//		std::cout << "(" << p.leave << "," << p.enter << ")" << std::endl;
-//		tab.doPivot(p.enter, p.leave);
-//		++pivot_count;
-//		printMatrix(tab.mat(), n, d, std::cout);
-//		p = tab.ratioTest();
-//	}
+//	pivot p = simplexSolve(tab, &pivot_count, std::cout);
+	// Get first pivot
+	pivot p = tab.ratioTest();
+	// Pivot as long as more pivots exist
+	while ( p != tableau_optimal && p != tableau_unbounded ) {
+		std::cout << "(" << p.leave << "," << p.enter << ")" << std::endl;
+		tab.doPivot(p.enter, p.leave);
+		++pivot_count;
+		printMatrix(tab.mat(), n, d, std::cout);
+		p = tab.ratioTest();
+	}
 	
 	timer end = now();
 	
