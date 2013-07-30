@@ -566,13 +566,12 @@ namespace lrs {
 		return ( enter > 0 ) ? B[enter] : -1;
 	}
 	
-	void lrs::pivot(ind leave, ind enter) {
+	void lrs::pivot(ind enter, ind leave) {
+		ind bas = findBas(enter);
+		if (bas < 0) throw lrs_error("Failed to find basis for pivot.");
 		
 		ind cob = findCob(leave);
 		if (cob < 0) throw lrs_error("Failed to find cobasis for pivot.");
-		
-		ind bas = findBas(enter);
-		if (bas < 0) throw lrs_error("Failed to find basis for pivot.");
 		
 		::pivot(P, Q, bas, cob);
 		::update(P, Q, &bas, &cob);
