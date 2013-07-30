@@ -72,8 +72,9 @@ namespace lrs {
 		
 		// Initialize the inequality array
 		ind i = 1;
-		for (; i <= P->d; ++i) Q->inequality[i] = P->C[i-1];
-		for (; i <= P->m; ++i) Q->inequality[i] = P->B[i];
+		ind lastdv = Q->lastdv;
+		for (i = lastdv + 1; i <= P->m; ++i) Q->inequality[P->B[i]-lastdv] = i;
+		for (i = 0; i < lastdv; ++i) Q->inequality[P->C[i]-lastdv] = i;
 	}
 	
 	lrs::~lrs() {
