@@ -91,7 +91,6 @@ namespace lrs {
 		ind* Row = P->Row;
 		ind* Col = P->Col;
 		ind* minratio = Q->minratio;
-		ind* inequality = Q->inequality;
 		ind m = P->m;
 		ind d = P->d;
 		ind lastdv = Q->lastdv;
@@ -187,9 +186,9 @@ namespace lrs {
 		start = nstart;
 		
 		/* prepare return set */
-		index_set rval(m+1);
+		index_set rval(m+d+1);
 		for (ind i = start; i < start + degencount; i++) {
-			rval.set( inequality[ B[minratio[i]] - lastdv ] );
+			rval.set(B[minratio[i]]);
 		}
 		
 		return rval;
@@ -203,7 +202,6 @@ namespace lrs {
 		ind* Row = P->Row;
 		ind* Col = P->Col;
 		ind* minratio = Q->minratio;
-		ind* inequality = Q->inequality;
 		ind m = P->m;
 		ind d = P->d;
 		ind lastdv = Q->lastdv;
@@ -349,14 +347,14 @@ namespace lrs {
 		mpz_clear(nNmin); mpz_clear(nDmin); mpz_clear(pNmin); mpz_clear(pDmin);
 		
 		/* prepare return set */
-		index_set rval(m+1);
+		index_set rval(m+d+1);
 		for (ind i = 0; i < nEnter; i++) {
 			/* read in zeros and min negatives */
-			rval.set( inequality[ B[minratio[i] ] - lastdv ] );
+			rval.set( B[minratio[i]] );
 		}
 		for (ind i = pEnter+1; i <= m; i++) {
 			/* read in positive values */
-			rval.set( inequality[ B[minratio[i] ] - lastdv ] );
+			rval.set( B[minratio[i]] );
 		}
 		
 		return rval;
@@ -365,14 +363,13 @@ namespace lrs {
 	std::pair<ind,ind> lrs::blandRatio() {
 		ind* B = P->B;
 		ind* C = P->C;
-		ind* inequality = Q->inequality;
 		ind lastdv = Q->lastdv;
 		ind d = P->d;
 		
 		ind enter, leave;
 		if ( ::dan_selectpivot(P, Q, &enter, &leave) ) {
 			/* pivot found */
-			return std::make_pair(inequality[ B[enter]-lastdv ], inequality[ C[leave]-lastdv ]);
+			return std::make_pair(B[enter], C[leave]);
 		} else {
 			/* tableau optimal or unbounded */
 			if ( leave == d ) {
@@ -388,25 +385,23 @@ namespace lrs {
 	ind lrs::findBas(ind enter) {
 		ind j;
 		ind lastdv = Q->lastdv;
-		ind *inequality = Q->inequality;
 		ind *B = P->B;
 		ind m = P->m;
 		
-		for (j = lastdv+1; j <= m && inequality[ B[j]-lastdv ] != enter; j++);
+		for (j = lastdv+1; j <= m && B[j] != enter; j++);
 		
-		return (inequality[ B[j]-lastdv ] != enter) ? -1 : j;
+		return (B[j] != enter) ? -1 : j;
 	}
 	
 	ind lrs::findCob(ind leave) {
 		ind j;
 		ind lastdv = Q->lastdv;
-		ind *inequality = Q->inequality;
 		ind *C = P->C;
 		ind d = P->d;
 		
-		for (j = 0; j < d && inequality[ C[j]-lastdv ] != leave; j++);
+		for (j = 0; j < d && C[j] != leave; j++);
 		
-		return (inequality[ C[j]-lastdv ] != leave) ? -1 : j;
+		return (C[j] != leave) ? -1 : j;
 	}
 	
 	cobasis* lrs::getCobasis(ind col) {
@@ -421,7 +416,6 @@ namespace lrs {
 		ind* C = P->C;
 		ind* Col = P->Col;
 		ind* Row = P->Row;
-		ind* inequality = Q->inequality;
 		ind* tempArray = Q->temparray;
 		ind d = P->d;
 		ind lastdv = Q->lastdv;
@@ -429,13 +423,13 @@ namespace lrs {
 		
 		ind nIncidence;  /* count number of tight inequalities */
 		
-		index_set cobInd(m+1);
-		index_set extraInc(m+1);
+		index_set cobInd(m+d+1);
+		index_set extraInc(m+d+1);
 		
 		for (i = 0; i < d; i++) {
 			if (Col[i] == col) rflag = tempArray[i]; /* look for ray index */
 			
-			tempArray[i] = inequality[C[i] - lastdv];
+			tempArray[i] = C[i];
 			cobInd.set(tempArray[i]);
 		}
 		
@@ -444,7 +438,7 @@ namespace lrs {
 		for (i = lastdv + 1; i <= m; i++) {
 			if ( zero( A[Row[i]][0] ) ) {
 				if ( (col == 0L) || zero( A[Row[i]][col] ) ) {
-					extraInc.set(inequality[B[i] - lastdv]);
+					extraInc.set(B[i]);
 					nIncidence++;
 				}
 			}
@@ -560,7 +554,6 @@ namespace lrs {
 		
 		ind* Col = P->Col;
 		ind* B = P->B;
-		ind* inequality = Q->inequality;
 		ind lastdv = Q->lastdv;
 		
 		if ( ( cob = findCob(leave) ) < 0 ) {
@@ -570,7 +563,7 @@ namespace lrs {
 		ind col = Col[cob];
 		ind enter = ratio(P, Q, col);
 		
-		return ( enter > 0 ) ? inequality[ B[enter]-lastdv ] : -1;
+		return ( enter > 0 ) ? B[enter] : -1;
 	}
 	
 	void lrs::pivot(ind leave, ind enter) {
@@ -606,7 +599,7 @@ namespace lrs {
 		out << "\n Co-Basis "; for (i = 0; i <= d; i++) out << C[i] << " ";
 		out << " Column "; for (i = 0; i <= d; i++) out << Col[i] << " ";
 		out << " det=" << toString(P->det);
-		out << "\n Ineq     "; for (i = 0; i <=m; ++i) out << Q->inequality[i] << " ";
+//		out << "\n Ineq     "; for (i = 0; i <=m; ++i) out << Q->inequality[i] << " ";
 		out << "\n";
 		
 		for (i = 0; i <= m; i++) {

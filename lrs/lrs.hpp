@@ -106,14 +106,14 @@ namespace lrs {
 		std::pair<ind,ind> blandRatio();
 		
 		/** finds the index in the basis array for a given entering index from 
-		 *  the original list of constraints.
+		 *  the original list of variables.
 		 *  @param enter		The index to enter the active dictionary
 		 *  @return the basis index for enter, -1 for none such found
 		 */
 		ind findBas(ind enter);
 		
 		/** finds the index in the cobasis array for a given leaving index from 
-		 *  the original list of constraints.
+		 *  the original list of variables.
 		 *  @param leave		The index to leave the active dictionary
 		 *  @return the cobasis index for leave, -1 for none such found
 		 */
