@@ -387,7 +387,7 @@ namespace lrs {
 		/* find minratio leaving column */
 		for (ind k = lastdv + 1; k <= m; ++k) {
 			if ( negative(A[Row[k]][col]) ) {
-				if ( leave == 0 ) {
+				if ( enter == 0 ) {
 					row = Row[k];
 					enter = B[k];
 				} else {
