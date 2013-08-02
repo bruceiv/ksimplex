@@ -1,6 +1,7 @@
 CC = gcc
 CPPFLAGS = -DTIMES -DGMP -DLRS_QUIET
-CFLAGS = -ggdb
+#CFLAGS = -O0 -ggdb
+CFLAGS = -02
 CXXFLAGS = $(CFLAGS) -Wall -Wno-unused
 LDFLAGS = -lgmpxx -lgmp
 

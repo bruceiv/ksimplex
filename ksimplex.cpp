@@ -160,8 +160,8 @@ int main(int argc, char **argv) {
 	// Run simplex algorithm
 	u32 pivot_count = 0;
 	timer start = now();
-//	pivot p = simplexSolve(tab, &pivot_count, std::cout);
-	// Get first pivot
+	pivot p = simplexSolve(tab, &pivot_count, std::cout);
+/*	// Get first pivot
 	pivot p = tab.ratioTest();
 	// Pivot as long as more pivots exist
 	while ( p != tableau_optimal && p != tableau_unbounded ) {
@@ -171,7 +171,7 @@ int main(int argc, char **argv) {
 		printMatrix(tab.mat(), n, d, std::cout);
 		p = tab.ratioTest();
 	}
-	
+*/	
 	timer end = now();
 	
 	std::string max;
