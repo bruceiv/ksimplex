@@ -176,7 +176,7 @@ public:	 //public interface
 		// Look for entering variable
 		u32 enter = n+d+1;
 		
-		u32 i, iL, j, jE;
+		u32 i, iL, j, jE = 0;
 		
 		// Find first cobasic variable with positive objective value
 		for (j = 1; j <= d; ++j) {

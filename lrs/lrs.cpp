@@ -370,7 +370,7 @@ namespace lrs {
 		ind m = P->m;
 		ind d = P->d;
 		
-		ind col, row;
+		ind col = 0, row;
 		ind enter = 0, leave = m+d+1;
 		
 		/* find mimimum positive objective value */
