@@ -174,22 +174,19 @@ public:	 //public interface
 	 */
 	pivot ratioTest() {
 		// Look for entering variable
-		u32 enter = 0;
+		u32 enter = n+d+1;
 		
 		u32 i, iL, j, jE;
 		
-/*		// Find first cobasic variable with positive objective value
-		for (j = 1; j <= n+d; ++j) {
-			jE = col[j];  // Get column index of variable j
-			
-			// Check that objective value for j is positive
-			if ( jE != 0 && kilo::is_pos(m, obj(jE)) ) {
-				enter = j;
-				break;
+		// Find first cobasic variable with positive objective value
+		for (j = 1; j <= d; ++j) {
+			if ( kilo::is_pos(m, obj(j)) && c[j] < enter ) {
+				enter = c[j];
+				jE = j;
 			}
 		}
-*/		
-		// Find cobasic variable with maximum positive objective value (break ties by lex-order)
+		
+/*		// Find cobasic variable with maximum positive objective value (break ties by lex-order)
 		jE = 0;
 		for (j = 1; j <= d; ++j) {
 			// Ensure objective value is positive
@@ -208,9 +205,9 @@ public:	 //public interface
 				}
 			}
 		}
-				
+*/				
 		// If no increasing variables found, this is optimal
-		if ( enter == 0 ) return tableau_optimal;
+		if ( enter == n+d+1 ) return tableau_optimal;
 		
 		u32 iMin = 0;
 		u32 leave = 0;

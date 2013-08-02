@@ -105,6 +105,12 @@ namespace lrs {
 		 */
 		std::pair<ind,ind> blandRatio();
 		
+		/** Finds the indices of the next pivot according to Dantzig's pivot rule, as implemented 
+		 *  in dan_selectpivot() in lrslib.
+		 *  @return a pair (enter, leave); (0, 0) if optimal, (OxFFFFFFFF, 0xFFFFFFFF) if unbounded
+		 */
+		std::pair<ind,ind> danRatio();
+		
 		/** finds the index in the basis array for a given entering index from 
 		 *  the original list of variables.
 		 *  @param enter		The index to enter the active dictionary

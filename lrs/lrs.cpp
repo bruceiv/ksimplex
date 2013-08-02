@@ -361,6 +361,57 @@ namespace lrs {
 	}
 	
 	std::pair<ind,ind> lrs::blandRatio() {
+		matrix_t& A = P->A;
+		ind* B = P->B;
+		ind* C = P->C;
+		ind* Row = P->Row;
+		ind* Col = P->Col;
+		ind lastdv = Q->lastdv;
+		ind m = P->m;
+		ind d = P->d;
+		
+		ind col, row;
+		ind enter = 0, leave = m+d+1;
+		
+		/* find mimimum positive objective value */
+		for (ind k = 0; k < d; ++k) {
+			if ( positive(A[0][Col[k]]) && C[k] < leave ) {
+				col = Col[k];
+				leave = C[k];
+			}
+		}
+		
+		/* tableau optimal */
+		if ( leave == m+d+1 ) return std::make_pair<ind,ind>(0, 0);
+		
+		/* find minratio leaving column */
+		for (ind k = lastdv + 1; k <= m; ++k) {
+			if ( negative(A[Row[k]][col]) ) {
+				if ( leave == 0 ) {
+					row = Row[k];
+					enter = B[k];
+				} else {
+					ind i = B[k];
+					
+					/* Compute Bland's ratio */
+					ind comp = comprod(A[row][0], A[Row[k]][col], A[Row[k]][0], A[row][col]);
+					
+					/* Test ratio */
+					if ( comp == -1 || ( comp == 0 && i < enter ) ) {
+						row = Row[k];
+						enter = i;
+					}
+				}
+			}
+		}
+		
+		/* tableau unbounded */
+		if ( enter == 0 ) return std::make_pair<ind,ind>(0xFFFFFFFF, 0xFFFFFFFF);
+		
+		return std::make_pair(enter,leave);
+	}
+	
+	std::pair<ind,ind> lrs::danRatio() {
 		ind* B = P->B;
 		ind* C = P->C;
 		ind lastdv = Q->lastdv;
