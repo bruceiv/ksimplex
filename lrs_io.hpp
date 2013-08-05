@@ -127,9 +127,7 @@ lrs::vector_mpz* parseLrsHex(std::istream& in, u32 n, u32 d) {
 	std::ios_base::fmtflags flags = in.flags();
 	in >> std::hex;
 	for (u32 i = 0; i <= n; ++i) {
-		in >> (*m)[i*(d+1)+d];  // constant term
-		
-		for (u32 j = 0; j < d; ++j) {  // other terms
+		for (u32 j = 0; j <= d; ++j) {
 			in >> (*m)[i*(d+1)+j];
 		}
 	}
