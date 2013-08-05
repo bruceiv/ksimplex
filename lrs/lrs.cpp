@@ -34,8 +34,8 @@ namespace lrs {
 		initDic(Q, P, m, lin);
 	}
 	
-	lrs::lrs(matrix_mpq const& m, index_set const& lin, val_t& det, const ind* bas, 
-	         lrs_opts o) : o(o) {
+	lrs::lrs(vector_mpz const& m, ind n, ind d, index_set const& lin, val_t& det, 
+	         const ind* bas, lrs_opts o) : o(o) {
 		/* Initialize LRS */
 		lrs_init_quiet(stdin, stderr);
 		
@@ -44,12 +44,12 @@ namespace lrs {
 		if (Q == 0) throw std::bad_alloc();
 		
 		/* Init LRS LP dictionary */
-		initDat(Q, m.size(), m.dim());
+		initDat(Q, n, d+1);
 		
 		P = lrs_alloc_dic(Q);
 		if (P == 0) throw std::bad_alloc();
 		
-		initDic(Q, P, m, lin);
+		copyDic(Q, P, m, lin);
 		
 		// Copy determinant value in
 		copy(P->det, det);
@@ -598,6 +598,23 @@ namespace lrs {
 				P, Q, i+1, row.num().v, row.den().v, (lin[i+1]) ? eq : ge);
 		}
 		
+	}
+	
+	void lrs::copyDic(lrs_dat* Q, lrs_dic* P, vector_mpz const& mat, 
+	                  index_set const& lin) {
+		
+		matrix_t& A = P->A;
+		ind m = Q->m;
+		ind d = Q->n - 1;
+		Q->maximize = true;
+		
+		ind k = 0;
+		for (ind i = 0; i <= m; ++i) {
+			for (ind j = 0; j <= d; ++j) {
+				mpz_set(A[i][j], mat[k]);
+				++k;
+			}
+		}
 	}
 	
 	ind lrs::lexRatio(ind leave) {

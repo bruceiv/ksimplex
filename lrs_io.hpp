@@ -109,6 +109,35 @@ lrs::matrix_mpq* parseHexMatrix(std::istream& in, u32 n, u32 d) {
 	return m;
 }
 
+/**
+ * Reads a matrix/objective pair in KSimplex format into a LRS-format vector from the given input 
+ * stream.
+ * All values are hexadecimal integers; the values follow the following format, where the first row 
+ * is the objective row, and the first column is the constant values:
+ * \< n+1 * d+1 whitespace delimited data values \>
+ * 
+ * @param in        The input stream to read from
+ * @param n         The number of rows (excluding the objective)
+ * @param d         The number of columns (excluding the constant column)
+ * @return teh matrix read from the stream (should be freed with delete)
+ */
+lrs::vector_mpz* parseLrsHex(std::istream& in, u32 n, u32 d) {
+	lrs::vector_mpz* m = new lrs::vector_mpz((n+1)*(d+1));
+	
+	std::ios_base::fmtflags flags = in.flags();
+	in >> std::hex;
+	for (u32 i = 0; i <= n; ++i) {
+		in >> (*m)[i*(d+1)+d];  // constant term
+		
+		for (u32 j = 0; j < d; ++j) {  // other terms
+			in >> (*m)[i*(d+1)+j];
+		}
+	}
+	in.flags(flags);
+	
+	return m;
+}
+
 /** Parses a LRS value in hex, compatible with KSimplex input. */
 void parseHex(std::istream& in, lrs::val_t& x) {
 	std::ios_base::fmtflags flags = in.flags();

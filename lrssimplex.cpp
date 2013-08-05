@@ -38,12 +38,10 @@ int main(int argc, char** argv) {
 	for (u32 i = 0; i <= n; ++i) std::cin >> bas[i];
 	
 	// Read in matrix, grab objective row first
-	lrs::vector_mpq& obj = *parseHexVector(std::cin, d);
-	lrs::matrix_mpq& mat = *parseHexMatrix(std::cin, n, d);
+	lrs::vector_mpz& mat = *parseLrsHex(std::cin, n, d);
 	
 	// Create LRS instance initialized to the given determinant and basis, and set objective
-	lrs::lrs& l = *new lrs::lrs(mat, lrs::index_set(mat.size()+1), det, bas);
-	l.setLPObj(obj);
+	lrs::lrs& l = *new lrs::lrs(mat, n, d, lrs::index_set(mat.size()+1), det, bas);
 	
 	// Construct tableau
 	lrs_tableau tab(l, n, d);
@@ -96,7 +94,6 @@ int main(int argc, char** argv) {
 	//Cleanup
 	delete &l;
 	delete &mat;
-	delete &obj;
 	delete[] bas;
 	lrs_clear_mp(det);
 	

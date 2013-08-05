@@ -1,8 +1,8 @@
 CC = gcc
 CXX = g++
 CPPFLAGS = -DTIMES -DGMP -DLRS_QUIET
-#CFLAGS = -O0 -ggdb
-CFLAGS = -O2
+CFLAGS = -O0 -ggdb
+#CFLAGS = -O2
 CXXFLAGS = $(CFLAGS) -Wall -Wno-unused
 LDFLAGS = -lgmpxx -lgmp
 

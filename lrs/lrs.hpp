@@ -69,7 +69,10 @@ namespace lrs {
 		lrs(matrix_mpq const& m, index_set const& lin, lrs_opts o = lrs_opts());
 		
 		/** Secondary constructor / initializer; allows LRS to be initialized to a specific basis.
-		 *  @param m 			the matrix to load into LRS
+		 *  @param m 			the matrix to load into LRS. 
+		 *  					Vector in same layout as LRS internal storage.
+		 *  @param n            the number of matrix rows (excluding objective)
+		 *  @param d            the matrix dimension (excluding constant)
 		 *  @param lin			the linearity indices of this matrix
 		 *  @param det			the initial determinant
 		 *  @param bas			the initial basis indices
@@ -77,8 +80,8 @@ namespace lrs {
 		 *  @throw bad_alloc	if the LRS process or matrix data structures 
 		 * 						cannot be properly initialized.
 		 */
-		lrs(matrix_mpq const& m, index_set const& lin, val_t& det, const ind* bas, 
-		    lrs_opts o = lrs_opts());
+		lrs(vector_mpz const& m, ind n, ind d, index_set const& lin, val_t& det, 
+		    const ind* bas, lrs_opts o = lrs_opts());
 		
 		/** destructor */
 		~lrs();
@@ -228,6 +231,16 @@ namespace lrs {
 		 *  @param lin		The linearity rows in the matrix
 		 */
 		void initDic(lrs_dat* Q, lrs_dic* P, matrix_mpq const& mat, 
+					 index_set const& lin);
+		
+		/** Initializes LRS's dictionary for a problem - exactly copies values.
+		 *  Derived from lrs_read_dic (very loosely)
+		 *  @param Q		The problem data (should be initialized)
+		 *  @param P		The dictionary to initialize (should be allocated)
+		 *  @param mat		The matrix to read in
+		 *  @param lin		The linearity rows in the matrix
+		 */
+		void copyDic(lrs_dat* Q, lrs_dic* P, vector_mpz const& mat, 
 					 index_set const& lin);
 		
 		/** Prints the parameter to a string. Non-negative values will be 

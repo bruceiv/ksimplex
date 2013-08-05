@@ -79,10 +79,10 @@ int main(int argc, char** argv) {
 	l.getFirstBasis(false);
 	
 	// Reduce tableau to lowest terms
-	toLowestTerms(l, n, d);
+//	toLowestTerms(l, n, d);
 	
 	// Write size and dimension of problem, as well as determinant
-	std::cout << n << " " << d << " " << 1 /*hex(l.getDeterminant())*/ << std::endl;
+	std::cout << n << " " << d << " " << hex(l.getDeterminant()) << std::endl;
 	
 	// Write initial basis
 	lrs::ind* bas = l.getLPBasis();
