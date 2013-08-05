@@ -2,6 +2,8 @@
 # 
 # @author Aaron Moss
 
+CC = gcc
+CXX = g++
 # compiler flags
 CXXFLAGS = -O2 -Wall -Wno-unused-function
 #CXXFLAGS = -O0 -ggdb -Wall -Wno-unused-function

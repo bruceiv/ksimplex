@@ -1,4 +1,5 @@
 CC = gcc
+CXX = g++
 CPPFLAGS = -DTIMES -DGMP -DLRS_QUIET
 #CFLAGS = -O0 -ggdb
 CFLAGS = -O2
