@@ -6,10 +6,14 @@
 
 #include <iostream>
 #include <string>
+#include <sstream>
+
+#include <gmp.h>
 
 #include "cuda_tableau.cuh"
 #include "ksimplex.hpp"
 #include "simplex.hpp"
+#include "timing.hpp"
 
 #include "kilomp/kilomp.cuh"
 
@@ -155,16 +159,41 @@ int main(int argc, char **argv) {
 	
 	// Run simplex algorithm
 	u32 pivot_count = 0;
+	timer start = now();
 	pivot p = simplexSolve(tab, &pivot_count, std::cout);
+	timer end = now();
 	
+	const kilo::mpv& tmat = tab.mat();
+	std::string max;
 	if ( p == tableau_optimal ) {
 		std::cout << "tableau: OPTIMAL" << std::endl;
+		
+		// generate max
+		std::stringstream ss;
+		print(tmat, 1, ss);
+		ss << "/";
+		print(tmat, 0, ss);
+		
+		mpq_t opt;
+		mpq_init(opt);
+		mpq_set_str(opt, ss.str().c_str(), 16);
+		mpq_canonicalize(opt);
+		max = std::string(mpq_get_str((char*)0, 10, opt));
+		mpq_clear(opt);
 	} else if ( p == tableau_unbounded ) {
 		std::cout << "tableau: UNBOUNDED" << std::endl;
+		max = "UNBOUNDED";
 	}
 	
 	// Print final tableau
-	printMatrix(tab.mat(), n, d, std::cout);
+	printMatrix(tmat, n, d, std::cout);
+	
+	// Print summary information
+	std::cout << "\nn:        " << n
+	          << "\nd:        " << d
+	          << "\npivots:   " << pivot_count
+	          << "\noptimal:  " << max
+	          << "\ntime(ms): " << ms_between(start, end) << std::endl;
 	
 	// Cleanup
 	delete[] cob;

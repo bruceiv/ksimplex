@@ -5,8 +5,8 @@
 CC = gcc
 CXX = g++
 # compiler flags
-#CXXFLAGS = -O2 -Wall -Wno-unused-function
-CXXFLAGS = -O0 -ggdb -Wall -Wno-unused-function
+CXXFLAGS = -O2 -Wall -Wno-unused-function
+#CXXFLAGS = -O0 -ggdb -Wall -Wno-unused-function
 # LRS compiler flags
 LRSCXXFLAGS = $(CXXFLAGS) -DTIMES -DGMP -DLRS_QUIET
 # CUDA compiler flags
@@ -40,7 +40,7 @@ gmpsimplex: gmpsimplex.cpp gmp_tableau.hpp ksimplex.hpp simplex.hpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o gmpsimplex gmpsimplex.cpp $(GMPLDFLAGS)
 
 dksimplex:  cudasimplex.cu cuda_tableau.cuh ksimplex.hpp simplex.hpp kilomp/kilomp.cuh kilomp/kilomp_cuda.cuh
-	nvcc $(CUDAFLAGS) -o dksimplex cudasimplex.cu $(LDFLAGS)
+	nvcc $(CUDAFLAGS) -o dksimplex cudasimplex.cu $(LDFLAGS) -lgmp
 
 dksimplex_debug:  cudasimplex.cu cuda_tableau.cuh ksimplex.hpp simplex.hpp kilomp/kilomp.cuh kilomp/kilomp_cuda.cuh
 	nvcc $(CUDADEBUGFLAGS) -o dksimplex cudasimplex.cu $(LDFLAGS)

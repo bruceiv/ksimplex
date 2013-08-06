@@ -500,7 +500,7 @@ public:	 //public interface
 	}
 
 	/** Get a read-only matrix copy */
-	kilo::mpv mat() const {
+	const kilo::mpv& mat() const {
 		ensure_limbs(a_dl);
 		kilo::copy_dh(m, m_d, m_hl, a_dl);
 		return m;

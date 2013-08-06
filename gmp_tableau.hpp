@@ -156,23 +156,20 @@ public:	 //public interface
 	 */
 	pivot ratioTest() {
 		// Look for entering variable
-		u32 enter = 0;
+		u32 enter = n+d+1;
 		
-		u32 i, iL, j, jE;
+		u32 i, iL, j, jE = 0;
 		
 		// Find first cobasic variable with positive objective value
-		for (j = 1; j <= n+d; ++j) {
-			jE = col[j];  // Get column index of variable j
-			
-			// Check that objective value for j is positive
-			if ( jE != 0 && mpz_sgn(m[obj(jE)]) > 0 ) {
-				enter = j;
-				break;
+		for (j = 1; j <= d; ++j) {
+			if ( mpz_sgn(m[obj(j)]) > 0 && c[j] < enter ) {
+				enter = c[j];
+				jE = j;
 			}
 		}
 		
 		// If no increasing variables found, this is optimal
-		if ( enter == 0 ) return tableau_optimal;
+		if ( enter == n+d+1 ) return tableau_optimal;
 		
 		u32 iMin = 0;
 		u32 leave = 0;
