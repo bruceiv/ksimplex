@@ -242,7 +242,7 @@ private:  //internal convenience functions
 	/** Ensures at least a_n limbs are allocated in the device matrix */
 	void ensure_limbs_d(u32 a_n) {
 		if ( a_n > a_dl ) {
-			m = kilo::expand_d(m_d, m_dl, a_dl, a_n);
+			m_d = kilo::expand_d(m_d, m_dl, a_dl, a_n);
 			a_dl = a_n;
 		}
 	}
