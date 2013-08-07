@@ -10,9 +10,9 @@ CXXFLAGS = -O2 -Wall -Wno-unused-function
 # LRS compiler flags
 LRSCXXFLAGS = $(CXXFLAGS) -DTIMES -DGMP -DLRS_QUIET
 # CUDA compiler flags
-CUDAFLAGS = -O2 -arch=compute_20 -code=sm_21
+#CUDAFLAGS = -O2 -arch=compute_20 -code=sm_21
 # Debug-mode CUDA compiler flags
-CUDADEBUGFLAGS = -g -G -DDEBUG_CUDA -arch=compute_20 -code=sm_21
+CUDAFLAGS = -g -G -DDEBUG_CUDA -arch=compute_20 -code=sm_21
 #	--ptxas-options="-v"
 
 # Linker flags
@@ -41,9 +41,6 @@ gmpsimplex: gmpsimplex.cpp gmp_tableau.hpp ksimplex.hpp simplex.hpp
 
 dksimplex:  cudasimplex.cu cuda_tableau.cuh ksimplex.hpp simplex.hpp kilomp/kilomp.cuh kilomp/kilomp_cuda.cuh
 	nvcc $(CUDAFLAGS) -o dksimplex cudasimplex.cu $(LDFLAGS) -lgmp
-
-dksimplex_debug:  cudasimplex.cu cuda_tableau.cuh ksimplex.hpp simplex.hpp kilomp/kilomp.cuh kilomp/kilomp_cuda.cuh
-	nvcc $(CUDADEBUGFLAGS) -o dksimplex cudasimplex.cu $(LDFLAGS)
 
 lrspp:  lrspp.cpp lrs_io.hpp lrs ksimplex.hpp
 	$(CXX) $(CPPFLAGS) $(LRSCXXFLAGS) -o lrspp lrspp.cpp $(LRSLDFLAGS)
