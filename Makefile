@@ -10,9 +10,8 @@ CXXFLAGS = -O2 -Wall -Wno-unused-function
 # LRS compiler flags
 LRSCXXFLAGS = $(CXXFLAGS) -DTIMES -DGMP -DLRS_QUIET
 # CUDA compiler flags
-#CUDAFLAGS = -O2 -arch=compute_20 -code=sm_21
-# Debug-mode CUDA compiler flags
-CUDAFLAGS = -g -G -DDEBUG_CUDA -arch=compute_20 -code=sm_21
+CUDAFLAGS = -O2 -arch=compute_20 -code=sm_21
+#CUDAFLAGS = -g -G -DDEBUG_CUDA -arch=compute_20 -code=sm_21
 #	--ptxas-options="-v"
 
 # Linker flags
