@@ -627,7 +627,7 @@ DEVICE_HOST static u32 mul(mpv v, u32 r, u32 i, u32 j) {
 	//reset length -- l, accounting for possibility of short operands, with combination of signs
 	l -= (v[l][r] == 0);
 	v[0][r] = l;
-	if ( ! same_sign(v, i, j) ) v[0][r] *= -1;
+	if ( ! same_sign(v, i, j) ) v[0][r] *= (u32)-1;
 	return l;
 }
 
@@ -664,7 +664,7 @@ DEVICE_HOST static u32 div(mpv v, u32 r, u32 i, u32 j) {
 	//reset quotient length
 	q_l = (n-m) + (v[n-m+1][r] != 0);  //n-m, accounting for possibility of non-zero high limb
 	v[0][r] = q_l;
-	if ( ! same_sign(v, i, j) ) v[0][r] *= -1;  //with correct sign
+	if ( ! same_sign(v, i, j) ) v[0][r] *= (u32)-1;  //with correct sign
 	//reset remainder length
 	v[0][i] = r_l * sign(v, i);  //remainder length, with correct sign
 	

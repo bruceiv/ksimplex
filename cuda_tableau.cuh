@@ -437,14 +437,14 @@ public:	 //public interface
 	 */
 	pivot ratioTest() {
 		// Look for entering variable
-		u32 enter = 0, leave = 0, jE;
+		u32 enter = n+d+1, leave = 0, jE;
 		
 		// Find first cobasic variable with positive objective value on device
 		posObj_k<32><<< 1, 32 >>>(m_d, c_d, o_d, n, d); CHECK_CUDA_SAFE
 		cudaMemcpy(&enter, o_d, sizeof(u32), cudaMemcpyDeviceToHost); CHECK_CUDA_SAFE
 		
 		// If no increasing variables found, this is optimal
-		if ( enter == 0 ) return tableau_optimal;
+		if ( enter == n+d+1 ) return tableau_optimal;
 		jE = col[enter];
 		
 		ensure_temp_space_d();  // Ensure enough space in device temporary variables
