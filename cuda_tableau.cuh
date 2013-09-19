@@ -75,7 +75,6 @@ __global__ void posObj_k(kilo::mpv m_d, u32* c_d, u32* o_d, u32 n, u32 d) {
 	// Combine last step of reduction with output
 	if ( tid == 0 ) {
 		if ( enter[0] > enter[1] ) *o_d = enter[1];
-		else if ( enter[0] == n+d+1 ) *o_d = 0;
 		else *o_d = enter[0];
 	}
 }
