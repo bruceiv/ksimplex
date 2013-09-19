@@ -72,6 +72,9 @@ void print(const mpz_t* m, u32 i, std::ostream& out) {
  * @param out		The stream to write to
  */
 void printMatrix(const mpz_t* m, u32 n, u32 d, std::ostream& out) {
+	// Print determinant
+	out << "["; print(m, 0, out); out << "]" << std::endl;
+	// Print matrix
 	for (u32 i = 0; i <= n; ++i) {
 		for (u32 j = 0; j <= d; ++j) {
 			out << " ";

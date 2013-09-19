@@ -164,6 +164,9 @@ std::string hex(const lrs::val_t& x) {
 void printMatrix(const lrs::vector_mpz& m, u32 n, u32 d, std::ostream& out) {
 	std::ios_base::fmtflags flags = out.flags();
 	out << std::hex;
+	// Print determinant
+	out << "[" << mpz_class(m[0]) << "]" << std::endl;
+	// Print matrix
 	for (u32 i = 0; i <= n; ++i) {
 		for (u32 j = 0; j <= d; ++j) {
 			out << " " << mpz_class(m[1 + i*(d+1) + j]);
