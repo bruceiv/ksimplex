@@ -188,8 +188,6 @@ int main(int argc, char **argv) {
 		max = "UNBOUNDED";
 	}
 	
-	// Print final determinant
-	std::cout << "["; print(tmat, 0, std::cout); std::cout << "]" << std::endl;
 	// Print final tableau
 	printMatrix(tmat, n, d, std::cout);
 	
