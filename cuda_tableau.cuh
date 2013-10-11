@@ -225,6 +225,8 @@ __global__ void postPivot_k(kilo::mpv m_d, u32 jE, u32 iL, u32* b_d, u32* c_d, u
 		}
 	}
 	
+	__syncthreads();
+	
 	if ( tid == 0 ) {
 		// Reset pivot element, determinant
 		kilo::swap(m_d, 0, Mij);
