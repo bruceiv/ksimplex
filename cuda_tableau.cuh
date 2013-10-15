@@ -21,8 +21,6 @@ __device__ inline u32 con(u32 i, u32 n, u32 d) { return i*(d+1)+1; }
 __device__ inline u32 elm(u32 i, u32 j, u32 n, u32 d) { return i*(d+1)+j+1; }
 /** @return index of x'th temp variable (x >= 1) */
 __device__ inline u32 tmp(u32 x, u32 n, u32 d) { return (n+1)*(d+1)+x; }
-/** x is set to the max of x and y */
-__device__ inline void update_max(u32& x, u32 y) { if ( y > x ) x = y; }
 
 /** 
  * Finds the smallest index of a cobasic variable having a positive objective value. 
@@ -164,13 +162,12 @@ __global__ void minRatio_k(kilo::mpv m_d, u32* u_d, u32 jE, u32* b_d, u32* o_d, 
  * threads.
  * 
  * @param m_d  The matrix on device
- * @param u_d  The device-side limb counter
  * @param jE   Column index of the entering variable
  * @param iL   Row index of the leaving variable
  * @param n    The maximum valid row index
  * @param d    The maximum valid column index
  */
-__global__ void pivot_k(kilo::mpv m_d, u32* u_d, u32 jE, u32 iL, u32 n, u32 d) {
+__global__ void pivot_k(kilo::mpv m_d, u32 jE, u32 iL, u32 n, u32 d) {
 	// Get row and column indices
 	u32 i = blockIdx.x;
 	u32 j = threadIdx.x;
@@ -192,7 +189,7 @@ __global__ void pivot_k(kilo::mpv m_d, u32* u_d, u32 jE, u32 iL, u32 n, u32 d) {
 	kilo::mul(m_d, t1, Eij, Mij);
 	kilo::mul(m_d, Eij, Mi, elm(iL, j, n, d));
 	kilo::sub(m_d, t1, Eij);
-	update_max(*u_d, kilo::div(m_d, Eij, t1, 0));  //store # of limbs
+	kilo::div(m_d, Eij, t1, 0);
 }
 
 /**
@@ -206,13 +203,43 @@ __global__ void pivot_k(kilo::mpv m_d, u32* u_d, u32 jE, u32 iL, u32 n, u32 d) {
  * @param iL         Row index of the leaving variable 
  * @param b_d        The basis buffer on device
  * @param c_d        The cobasis buffer on device
+ * @param u_d        The device-side limb counter
  * @param n          The maximum valid row index
  * @param d          The maximum valid column index
  */
 template<u32 blockSize>
-__global__ void postPivot_k(kilo::mpv m_d, u32 jE, u32 iL, u32* b_d, u32* c_d, u32 n, u32 d) {
+__global__ void postPivot_k(kilo::mpv m_d, u32 jE, u32 iL, u32* b_d, u32* c_d, u32* u_d, 
+                            u32 n, u32 d) {
 	u32 tid = threadIdx.x;
 	u32 Mij = elm(iL, jE, n, d);
+	
+	// Update used limb counter
+	__shared__ u32 u_n[blockSize];
+	u_n[tid] = 0;
+	for (u32 i = tid; i <= (n+1)*(d+1); i += blockSize) {
+		u32 u_i = kilo::size(m_d, i);
+		if ( u_i > u_n[tid] ) u_n[tid] = u_i;
+	}
+	__syncthreads();
+	
+	// Reduce (with last warp unrolled)
+	for (u32 s = blockSize >> 1; s > 32; s >>= 1) {
+		if ( tid < s ) {
+			if ( u_n[tid+s] > u_n[tid] ) u_n[tid] = u_n[tid+s];
+		}
+		
+		__syncthreads();
+	}
+	if ( blockSize >= 64 && tid < 32 && u_n[tid+32] > u_n[tid] ) u_n[tid] = u_n[tid+32];
+	if ( blockSize >= 32 && tid < 16 && u_n[tid+16] > u_n[tid] ) u_n[tid] = u_n[tid+16];
+	if ( blockSize >= 16 && tid <  8 && u_n[tid+ 8] > u_n[tid] ) u_n[tid] = u_n[tid+ 8];
+	if ( blockSize >=  8 && tid <  4 && u_n[tid+ 4] > u_n[tid] ) u_n[tid] = u_n[tid+ 4];
+	if ( blockSize >=  4 && tid <  2 && u_n[tid+ 2] > u_n[tid] ) u_n[tid] = u_n[tid+ 2];
+	// Combine last step of reduction with output
+	if ( tid == 0 ) {
+		if ( u_n[1] > u_n[0] ) *u_d = u_n[1];
+		else *u_d = u_n[0];
+	}
 	
 	// Recalculate pivot row/column
 	if ( kilo::is_pos(m_d, Mij) ) {
@@ -490,8 +517,8 @@ public:	 //public interface
 		if ( ! has_space ) ensure_temp_space_d();
 		
 		// Perform pivot on device
-		pivot_k<<< n, d >>>(m_d, u_d, jE, iL, n, d); CHECK_CUDA_SAFE
-		postPivot_k<128><<< 1, 128 >>>(m_d, jE, iL, b_d, c_d, n, d); CHECK_CUDA_SAFE
+		pivot_k<<< n, d >>>(m_d, jE, iL, n, d); CHECK_CUDA_SAFE
+		postPivot_k<128><<< 1, 128 >>>(m_d, jE, iL, b_d, c_d, u_d, n, d); CHECK_CUDA_SAFE
 		
 		// Fix row and column
 		row[leave] = 0;
