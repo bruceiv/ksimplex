@@ -341,17 +341,16 @@ DEVICE_HOST static void lsh_l(mpv v, u32 i, u32 s, u32 n) {
 	u32 s_b = s & 0x1F;  // (s % 32) -- number of bits to shift
 	
 	u32 u_s = 32 - s_b;  // amount to "un-shift" high bits
-	u32 mask = ((1 << s_b) - 1) << u_s;  //mask for high bits
 	
 	u32 prev, next;
 	prev = next = v[n][i];
 	//set new high limb
-	v[n+s_l+1][i] = (next & mask) >> u_s;
+	v[n+s_l+1][i] = next >> u_s;
 	//shift remaining limbs
 	for (u32 k = n; k > 1; --k) {
 		next = v[k-1][i];
 		//get low order bits of current limb, then high order bits of next limb back
-		v[k+s_l][i] = (prev << s_b) | ((next & mask) >> u_s);
+		v[k+s_l][i] = (prev << s_b) | (next >> u_s);
 		prev = next;
 	}
 	//set new low limb
@@ -388,7 +387,7 @@ DEVICE_HOST static void lsh_l(mpv v, u32 i, u32 s, u32 n) {
 	
 	//zero high-order limbs
 	for (u32 k = n-s_l+1; k <= n; ++k) { v[k][i] = 0; }
- }
+}
 
 /** 
  * Multi-limb division function - (r'th element of v) = (i'th element of v) / (j'th element of v).
@@ -411,48 +410,59 @@ DEVICE_HOST static void divn_l(mpv v, u32 r, u32 i, u32 j, u32 n, u32 m) {
 	    s = (h > 0xF   ) << 2; h >>= s; d |= s;  //         ... in remaining top 4 bits
 	    s = (h > 0x3   ) << 1; h >>= s; d |= s;  //         ... in remaining top 2 bits
 	                                    d |= (h >> 1);  //  ... in remaining bit
-	d = 31 - d;  //how many bits to shift for normalization
+	d = 31 - d;        //how many bits to shift for normalization
+	u32 u_d = 32 - d;  //how many bits to unshift for logical normalization
 	
-	//normalize i'th and j'th elements by given amount
+	//normalize i'th element by given amount (j'th element will be *logically* left shifted by the 
+	//same amount - physically left shifting it can create race conditions)
 	if ( d > 0 ) {
 		lsh_l(v, i, d, n);
-		lsh_l(v, j, d, m);
 	}
+	
+	u32 v_j_m = (v[m][j] << d) | (v[m-1][j] >> u_d);  //v[m][j] logically shifted by d
+	u32 v_j_m1 = v[m-1][j] << d;                      //v[m-1][j] logically shifted by d
+	if ( m > 2 ) v_j_m1 |= (v[m-2][j] >> u_d);
 	
 	//divide first m digits of the dividend by the divisor
 	for (u32 k = o; true; --k) {
 		//determine trial quotient qh
 		u32 qh, rh;
 		u64 t1, t2, t3;
-		if ( v[k+m+1][i] == v[m][j] ) {
+		if ( v[k+m+1][i] == v_j_m ) {
 			qh = 0xFFFFFFFF;
 		} else {
 			t1 = v[k+m+1][i]; t1 <<= 32; t1 |= v[k+m][i];
-			qh = t1 / v[m][j];
-			rh = t1 % v[m][j];
+			qh = t1 / v_j_m;
+			rh = t1 % v_j_m;
 			
-			t2 = v[m-1][j]; t2 *= qh;
+			t2 = v_j_m1; t2 *= qh;
 			t3 = rh; t3 <<= 32; t3 |= v[k+m-1][i];
 			while ( t2 > t3 ) {
 				//update trial quotient if needed - will run at most twice (?)
 				--qh;
-				if ( rh + v[m][j] < rh ) break;
-				rh += v[m][j];
+				if ( rh + v_j_m < rh ) break;
+				rh += v_j_m;
 				
-				t2 = v[m-1][j]; t2 *= qh;
+				t2 = v_j_m1; t2 *= qh;
 				t3 = rh; t3 <<= 32; t3 |= v[k+m-1][i];
 			}
 		}
 		
 		//replace dividend by remainder of division by qh * divisor
 		u32 b = 0, c = 0;
-		for (u32 l = 1; l <= m; ++l) {
-			t1 = qh; t1 *= v[l][j]; t1 += b;
+		
+		// unroll first loop iteration to account for logical left shift
+		t1 = qh; t1 *= (v[1][j] << d); t1 += b;
+		c = (t1 & 0xFFFFFFFF);
+		b = (t1 >> 32);
+		if (v[k+1][i] < c) ++b;
+		v[k+1][i] -= c;
+		// remainder of loop
+		for (u32 l = 2; l <= m; ++l) {
+			t1 = qh; t1 *= ((v[l][j] << d) | (v[l-1][j] >> u_d)); t1 += b;
 			c = (t1 & 0xFFFFFFFF);
 			b = (t1 >> 32);
-			
 			if (v[k+l][i] < c) ++b;
-			
 			v[k+l][i] -= c;
 		}
 		
@@ -462,8 +472,16 @@ DEVICE_HOST static void divn_l(mpv v, u32 r, u32 i, u32 j, u32 n, u32 m) {
 			qh--;
 			
 			c = 0;
-			for (u32 k_a = k+1; k_a <= m+k; ++k_a) {
-				u32 t_a = v[k_a][i] + v[k_a][j];
+			u32 k_a = k+1;
+			//unroll first loop iteration for logical left shift
+			if ( k_a == 1 ) {
+				u32 t_a = v[1][i] + (v[1][j] << d);
+				v[1][i] = t_a + c;
+				c = (t_a < v[1][i]) | (c & (v[1][i] == 0));
+				++k_a;
+			}
+			for (; k_a <= m+k; ++k_a) {
+				u32 t_a = v[k_a][i] + ((v[k_a][j] << d) | (v[k_a-1][j] >> u_d));
 				v[k_a][i] = t_a + c;
 				c = (t_a < v[k_a][i]) | (c & (v[k_a][i] == 0));
 			}
@@ -478,10 +496,9 @@ DEVICE_HOST static void divn_l(mpv v, u32 r, u32 i, u32 j, u32 n, u32 m) {
 		if ( k == 0 ) break;
 	}
 	
-	//un-normalize i'th and j'th elements
+	//un-normalize i'th element
 	if ( d > 0 ) {
 		rsh_l(v, i, d, n+1);
-		rsh_l(v, j, d, m);
 	}
 }
 
@@ -626,8 +643,6 @@ DEVICE_HOST static u32 mul(mpv v, u32 r, u32 i, u32 j) {
 	
 	//reset length -- l, accounting for possibility of short operands, with combination of signs
 	l -= (v[l][r] == 0);
-	//v[0][r] = l;
-	//if ( ! same_sign(v, i, j) ) v[0][r] *= (u32)-1;
 	v[0][r] = neg_if(l, !same_sign(v, i, j));
 	return l;
 }
@@ -664,8 +679,6 @@ DEVICE_HOST static u32 div(mpv v, u32 r, u32 i, u32 j) {
 	
 	//reset quotient length
 	q_l = (n-m) + (v[n-m+1][r] != 0);  //n-m, accounting for possibility of non-zero high limb
-	//v[0][r] = q_l;
-	//if ( ! same_sign(v, i, j) ) v[0][r] *= (u32)-1;  //with correct sign
 	v[0][r] = neg_if(q_l, !same_sign(v, i, j));
 	//reset remainder length
 	v[0][i] = r_l * sign(v, i);  //remainder length, with correct sign
