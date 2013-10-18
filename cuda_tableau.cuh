@@ -157,6 +157,21 @@ __global__ void minRatio_k(kilo::mpv m_d, u32* u_d, u32 jE, u32* b_d, u32* o_d, 
 }
 
 /**
+ * Sets up the tableau for a pivot. Stores the sign of the pivot element in the determinant.
+ * Intended to be private to cuda_tableau class; should be called with 1 block of 1 thread.
+ * 
+ * @param m_d  The matrix on device
+ * @param jE   Column index of the entering variable
+ * @param iL   Row index of the leaving variable
+ * @param n    The maximum valid row index
+ * @param d    The maximum valid column index
+ */
+__global__ void prePivot_k(kilo::mpv m_d, u32 jE, u32 iL, u32 n, u32 d) {
+	// Keep sign of M[iL,jE] in determinant
+	if ( kilo::is_neg(m_d, elm(iL, jE, n, d)) ) { kilo::neg(m_d, 0); }
+}
+
+/**
  * Pivots the tableau on device. Substitues all values but those in the leaving row and entering 
  * column. Intended to be private to cuda_tableau class; should be called with n blocks of d 
  * threads.
@@ -172,19 +187,13 @@ __global__ void pivot_k(kilo::mpv m_d, u32 jE, u32 iL, u32 n, u32 d) {
 	u32 i = blockIdx.x;
 	u32 j = threadIdx.x;
 	u32 t1 = tmp((i*d)+j+1, n, d);
-	
-	// Keep sign of M[iL,jE] in det (0)
-	u32 Mij = elm(iL, jE, n, d);
-	if ( i == 0 && j == 0 ) {
-		if ( kilo::is_neg(m_d, Mij) ) { kilo::neg(m_d, 0); }
-	}
-	
+		
 	// Skip row/column of pivot
 	if ( i >= iL ) ++i;
 	if ( j >= jE ) ++j;
 	
 	// Rescale all other elements
-	u32 Mi = elm(i, jE, n, d), Eij = elm(i, j, n, d);
+	u32 Mij = elm(iL, jE, n, d), Mi = elm(i, jE, n, d), Eij = elm(i, j, n, d);
 	// M[i,j] = ( M[i,j]*M[iL,jE] - M[i,jE]*M[iL,j] )/det
 	kilo::mul(m_d, t1, Eij, Mij);
 	kilo::mul(m_d, Eij, Mi, elm(iL, j, n, d));
@@ -517,6 +526,7 @@ public:	 //public interface
 		if ( ! has_space ) ensure_temp_space_d();
 		
 		// Perform pivot on device
+		prePivot_k<<< 1,1 >>>(m_d, jE, iL, n, d); CHECK_CUDA_SAFE
 		pivot_k<<< n, d >>>(m_d, jE, iL, n, d); CHECK_CUDA_SAFE
 		postPivot_k<128><<< 1, 128 >>>(m_d, jE, iL, b_d, c_d, u_d, n, d); CHECK_CUDA_SAFE
 		
