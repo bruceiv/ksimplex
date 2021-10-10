@@ -7,9 +7,25 @@
  *
  * <op> is one of '+', '-', '*', '/' - '#' can also be used to indicate a skipped comment line
  * <value> should be a signed hexadecimal string (e.g. "-e4" or "6b")
- *
- * @author Aaron Moss
  */
+
+// Copyright 2013 Aaron Moss
+//
+// This file is part of KiloMP.
+//
+// KiloMP is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published 
+// by the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// KiloMP is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with KiloMP.  If not, see <https://www.gnu.org/licenses/>.
+
 
 #include <cuda.h>
 

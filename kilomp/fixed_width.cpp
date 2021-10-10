@@ -2,9 +2,24 @@
  * Writes a header to define signed and unsigned 32 and 64 bit types, 
  * as well as a ptr_size constant.
  * Will create the kilo::s32, kilo::s64, kilo::u32 and kilo::u64 types.
- *  
- * @author Aaron Moss
  */
+
+// Copyright 2013 Aaron Moss
+//
+// This file is part of KiloMP.
+//
+// KiloMP is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published 
+// by the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// KiloMP is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with KiloMP.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <iostream>
 #include <fstream>

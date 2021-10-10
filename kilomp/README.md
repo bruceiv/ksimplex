@@ -1,0 +1,2 @@
+## KiloMP Multi-precision Integer Library ##
+KiloMP is a multi-precision integer library that can be run either on a host or on a CUDA coprocessor. Its basic type is a vector of multi-precision integers, with limbs interleaved for more efficient vectorized processing. 
